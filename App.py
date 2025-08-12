@@ -563,8 +563,8 @@ def main():
 #     }
 #     </style>
 #     """
-#     st.markdown(background_css, unsafe_allow_html=True)
-def main():
+    st.markdown(background_css, unsafe_allow_html=True)
+# def main():
     # """Main application function"""
     # background_css = """
     # <style>
