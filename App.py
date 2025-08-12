@@ -529,7 +529,7 @@ def main():
     <style>
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-        background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
+        background-image: url("https://images.pexels.com/photos/414144/pexels-photo-414144.jpeg?_gl=1*erczru*_ga*MTQ1MTM5MzE2OS4xNzU1MDI3Mjcx*_ga_8JE65Q40S6*czE3NTUwMjcyNzEkbzEkZzEkdDE3NTUwMjczMzAkajEkbDAkaDA.");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
