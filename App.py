@@ -492,7 +492,7 @@ def main():
     background_css = """
     <style>
     .stApp {
-        background-image: "image.jpg"
+        background-image: #FFFFFF
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
