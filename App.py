@@ -522,7 +522,6 @@ def main():
     """
     st.markdown(background_css, unsafe_allow_html=True)
 
-    st.write("Script Version: 2.6 (Custom Search API with Background Image)")  # Debug
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
