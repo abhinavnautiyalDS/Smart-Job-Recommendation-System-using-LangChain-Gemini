@@ -614,7 +614,7 @@ def main():
     # /* Browse files button */
     
     # [data-testid="stFileUploaderBrowseButton"] > div:first-child {
-    #     background-color: #FFFFFF !important;
+    #     background-color: ##D3D3D3 !important;
     #     color: #000000 !important;
     #     border: 1px solid #CCCCCC !important;
     #     border-radius: 5px !important;
@@ -622,8 +622,8 @@ def main():
     # }
     
     # [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
-    #     background-color: #EAEAEA !important;
-    #     color: #000000 !important;
+    #     background-color: ##D3D3D3 !important;
+    #     color: #FFFFFF !important;
     # }
 
     /* Top navigation bar */
