@@ -527,7 +527,8 @@ def main():
     # Add background image CSS
     background_css = """
     <style>
-    .stApp {
+    /* Set background for entire app including top and browser file areas */
+    body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
         background-size: cover;
         background-position: center;
@@ -535,7 +536,7 @@ def main():
         background-repeat: no-repeat;
     }
     /* Improve text readability for main app */
-    .stApp * {
+    .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
         color: #000000;  /* Black text for contrast */
         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Minimal shadow for readability */
     }
@@ -549,13 +550,13 @@ def main():
     }
     /* Style buttons for better visibility against white background */
     .stButton>button {
-        background-color: #D3D3D3;  /* Dodger blue for contrast */
+        background-color: #1e90ff;  /* Dodger blue for contrast */
         color: white;
         border-radius: 5px;
         border: none;
     }
     .stButton>button:hover {
-        background-color: #D3D3D3;  /* Steel blue on hover */
+        background-color: #4682b4;  /* Steel blue on hover */
     }
     </style>
     """
