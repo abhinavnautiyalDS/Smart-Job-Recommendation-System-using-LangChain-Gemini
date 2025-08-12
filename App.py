@@ -535,22 +535,70 @@ def main():
         background-attachment: fixed;
         background-repeat: repeat;
     }
+    # /* Improve text readability for main app */
+    # .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
+    #     color: #000000;  /* Black text for contrast */
+    #     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Minimal shadow for readability */
+    # }
+    # /* Set sidebar background to white with black text */
+    # .stSidebar {
+    #     background-color: #FFFFFF;
+    # }
+    # .stSidebar * {
+    #     color: #000000;
+    #     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
+    # }
+    st.markdown("""
+    <style>
     /* Improve text readability for main app */
     .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
         color: #000000;  /* Black text for contrast */
-        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Minimal shadow for readability */
+        text-shadow: none; /* Remove shadows for cleaner text */
     }
+    
     /* Set sidebar background to white with black text */
     .stSidebar {
-        background-color: #FFFFFF;
+        background-color: #FFFFFF !important;
     }
     .stSidebar * {
-        color: #000000;
-        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
+        color: #000000 !important;
+        text-shadow: none !important;
     }
+    
+    /* Lighter drag-and-drop box */
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #F8F9FA !important;  /* Light grey */
+        border: 2px dashed #CCCCCC !important;
+        border-radius: 8px !important;
+        padding: 20px !important;
+    }
+    
+    /* Button styling */
+    button, .stButton>button {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 5px !important;
+        padding: 8px 16px !important;
+    }
+    
+    /* Horizontal line styling */
+    hr {
+        border-top: 1px solid #E0E0E0;
+    }
+    
+    /* Add space below header */
+    h1, h2, h3 {
+        margin-bottom: 10px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+    
     /* Style buttons for better visibility against white background */
     .stButton>button {
-        background-color: #D3D3D3;  /* Dodger blue for contrast */
+        background-color: #FFFFFF;  /* Dodger blue for contrast */
         color: white;
         border-radius: 5px;
         border: none;
