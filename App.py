@@ -1017,23 +1017,23 @@
 
 
 
-Smart Job Recommender - Streamlit Cloud Deployment Version
-=============================================
+# Smart Job Recommender - Streamlit Cloud Deployment Version
+# =============================================
 
-Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
-Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
+# Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
+# Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.6):
-- Added background image via CSS.
-- Expanded search queries for diversity.
-- Relaxed duplicate removal using apply_link.
-- Added debug output for API responses and queries.
-- Increased result limit to 10 per query.
-- Enhanced error handling for empty results.
+# Main changes (v2.6):
+# - Added background image via CSS.
+# - Expanded search queries for diversity.
+# - Relaxed duplicate removal using apply_link.
+# - Added debug output for API responses and queries.
+# - Increased result limit to 10 per query.
+# - Enhanced error handling for empty results.
 
-Author: AI Assistant (updated)
-Version: 2.6 (Custom Search API with Background Image)
-"""
+# Author: AI Assistant (updated)
+# Version: 2.6 (Custom Search API with Background Image)
+# """
 
 import streamlit as st
 import requests
