@@ -611,20 +611,20 @@ def main():
         color: #000000 !important;
     }
 
-    /* Browse files button */
+    # /* Browse files button */
     
-    [data-testid="stFileUploaderBrowseButton"] > div:first-child {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        border: 1px solid #CCCCCC !important;
-        border-radius: 5px !important;
-        padding: 4px 12px !important;
-    }
+    # [data-testid="stFileUploaderBrowseButton"] > div:first-child {
+    #     background-color: #FFFFFF !important;
+    #     color: #000000 !important;
+    #     border: 1px solid #CCCCCC !important;
+    #     border-radius: 5px !important;
+    #     padding: 4px 12px !important;
+    # }
     
-    [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
-        background-color: #EAEAEA !important;
-        color: #000000 !important;
-    }
+    # [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
+    #     background-color: #EAEAEA !important;
+    #     color: #000000 !important;
+    # }
 
     /* Top navigation bar */
     header[data-testid="stHeader"] {
