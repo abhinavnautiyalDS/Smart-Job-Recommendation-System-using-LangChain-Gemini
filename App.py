@@ -522,19 +522,19 @@ class SmartJobRecommenderRAG:
 #     </style>
 #     """
 #     st.markdown(background_css, unsafe_allow_html=True)
-# def main():
-#     """Main application function"""
-#     # Add background image CSS
-#     background_css = """
-#     <style>
-#     /* Set background for entire app including top and browser file areas */
-#     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-#         background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
-#         background-size: cover;
-#         background-position: center;
-#         background-attachment: fixed;
-#         background-repeat: repeat;
-#     }
+def main():
+    """Main application function"""
+    # Add background image CSS
+    background_css = """
+    <style>
+    /* Set background for entire app including top and browser file areas */
+    body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
+        background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-repeat: repeat;
+    }
     # /* Improve text readability for main app */
     # .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
     #     color: #000000;  /* Black text for contrast */
