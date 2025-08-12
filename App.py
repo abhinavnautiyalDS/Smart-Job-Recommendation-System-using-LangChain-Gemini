@@ -559,7 +559,7 @@ class SmartJobRecommenderRAG:
 #         border: none;
 #     }
 #     .stButton>button:hover {
-#         background-color: #000000;  /* Steel blue on hover */
+#         background-color: #FFFFFF;  /* Steel blue on hover */
 #     }
 #     </style>
 #     """
