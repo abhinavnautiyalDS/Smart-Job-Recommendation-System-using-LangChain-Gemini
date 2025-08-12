@@ -550,13 +550,13 @@ def main():
     }
     /* Style buttons for better visibility against white background */
     .stButton>button {
-        background-color: ##D3D3D3;  /* Dodger blue for contrast */
+        background-color: #D3D3D3;  /* Dodger blue for contrast */
         color: white;
         border-radius: 5px;
         border: none;
     }
     .stButton>button:hover {
-        background-color: #4682b4;  /* Steel blue on hover */
+        background-color: #000000;  /* Steel blue on hover */
     }
     </style>
     """
