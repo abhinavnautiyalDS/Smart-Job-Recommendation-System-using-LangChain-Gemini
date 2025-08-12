@@ -529,7 +529,7 @@ def main():
     <style>
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-        background-image: url("https://images.pexels.com/photos/3279307/pexels-photo-3279307.jpeg?_gl=1*69j723*_ga*MTQ1MTM5MzE2OS4xNzU1MDI3Mjcx*_ga_8JE65Q40S6*czE3NTUwMjcyNzEkbzEkZzEkdDE3NTUwMjc1OTkkajQ3JGwwJGgw");
+        background-image: url("https://images.pexels.com/photos/1431822/pexels-photo-1431822.jpeg?_gl=1*1q2m3hl*_ga*MTQ1MTM5MzE2OS4xNzU1MDI3Mjcx*_ga_8JE65Q40S6*czE3NTUwMjcyNzEkbzEkZzEkdDE3NTUwMjc3MzckajU5JGwwJGgw");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
