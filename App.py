@@ -5,16 +5,16 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes:
-- Replaced Google Jobs Search API with Google Custom Search JSON API.
-- Uses GOOGLE_API_KEY and SEARCH_ENGINE_ID from Streamlit secrets.
-- Simplified result parsing for web search results.
-- Removed unused pandas import.
-- Updated google-generativeai import to 'genai' for v0.8.0.
-- Added fallback for pypdf text extraction for v5.9.0.
+Main changes (v2.5):
+- Expanded search queries for diversity.
+- Relaxed duplicate removal using apply_link.
+- Added debug output for API responses and queries.
+- Increased result limit to 10 per query.
+- Enhanced error handling for empty results.
+- Kept compatibility with provided secrets.
 
 Author: AI Assistant (updated)
-Version: 2.4 (Custom Search API)
+Version: 2.5 (Custom Search API)
 """
 
 import streamlit as st
@@ -128,7 +128,7 @@ class SmartJobRecommenderRAG:
 
         try:
             response = self.gemini_client.generate_content(prompt)
-            response_text = response.text  # Updated for google-generativeai==0.8.0
+            response_text = response.text
 
             skills = []
             job_interests = []
@@ -212,39 +212,53 @@ class SmartJobRecommenderRAG:
 
             search_queries = []
             if skills:
-                primary_skills = skills[:2]
+                primary_skills = skills[:3]  # Use top 3 skills for diversity
                 for skill in primary_skills:
                     search_queries.extend([
                         f"{skill} developer jobs",
-                        f"{skill} engineer jobs"
+                        f"{skill} engineer jobs",
+                        f"{skill} full-time jobs",
+                        f"{skill} job openings"
                     ])
 
             if job_interests:
-                for interest in job_interests[:2]:
-                    search_queries.append(f"{interest} jobs")
+                for interest in job_interests[:3]:  # Use top 3 interests
+                    search_queries.extend([
+                        f"{interest} jobs",
+                        f"{interest} careers",
+                        f"{interest} opportunities"
+                    ])
 
             if not search_queries:
-                search_queries = ["software developer jobs", "python developer jobs"]
+                search_queries = ["software developer jobs", "python developer jobs", "data scientist jobs"]
+
+            st.write(f"🔍 Generated search queries: {search_queries}")  # Debug
 
             all_jobs = []
             all_internships = []
 
             url = "https://www.googleapis.com/customsearch/v1"
 
-            for query in search_queries[:3]:
+            for query in search_queries[:5]:  # Increased to 5 queries
                 try:
                     params = {
                         "key": google_api_key,
                         "cx": search_engine_id,
-                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com",
-                        "num": 8
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
+                        "num": 10,  # Max results per query
+                        "safe": "off"  # Disable SafeSearch for broader results
                     }
 
                     st.info(f"🔍 Searching Google Custom Search for '{query}'...")
 
                     response = requests.get(url, params=params, timeout=15)
-                    response.raise_for_status()
+                    st.write(f"API Response Status: {response.status_code}")  # Debug
+                    if response.status_code != 200:
+                        st.warning(f"API Error: {response.text}")
+                        continue
+
                     data = response.json()
+                    st.write(f"API Response Items: {len(data.get('items', []))}")  # Debug
 
                     items_key = "items"
                     if items_key not in data or not data[items_key]:
@@ -285,9 +299,9 @@ class SmartJobRecommenderRAG:
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
 
             return {
-                "jobs": unique_jobs[:15],
-                "internships": unique_internships[:8],
-                "search_queries": search_queries[:6]
+                "jobs": unique_jobs[:20],  # Increased limit
+                "internships": unique_internships[:10],  # Increased limit
+                "search_queries": search_queries[:8]
             }
 
         except Exception as e:
@@ -310,39 +324,55 @@ class SmartJobRecommenderRAG:
 
             search_queries = []
             if skills:
-                primary_skills = skills[:2]
+                primary_skills = skills[:3]
                 for skill in primary_skills:
                     search_queries.extend([
                         f"{skill} jobs {location}",
-                        f"{skill} developer {location}"
+                        f"{skill} developer {location}",
+                        f"{skill} engineer {location}",
+                        f"{skill} full-time {location}"
                     ])
 
             if job_interests:
-                for interest in job_interests[:2]:
-                    search_queries.append(f"{interest} {location}")
+                for interest in job_interests[:3]:
+                    search_queries.extend([
+                        f"{interest} {location}",
+                        f"{interest} jobs {location}"
+                    ])
 
             if any(word in location.lower() for word in ["india", "mumbai", "delhi", "bangalore", "chennai", "pune", "hyderabad"]):
                 search_queries.append(f"internship {location}")
+
+            if not search_queries:
+                search_queries = [f"software developer jobs {location}", f"python developer jobs {location}"]
+
+            st.write(f"🔍 Generated location-based search queries: {search_queries}")  # Debug
 
             all_jobs = []
             all_internships = []
 
             url = "https://www.googleapis.com/customsearch/v1"
 
-            for query in search_queries[:3]:
+            for query in search_queries[:5]:
                 try:
                     params = {
                         "key": google_api_key,
                         "cx": search_engine_id,
-                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com",
-                        "num": 8
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
+                        "num": 10,
+                        "safe": "off"
                     }
 
                     st.info(f"🔍 Searching Google Custom Search in {location} for '{query}'...")
 
                     response = requests.get(url, params=params, timeout=15)
-                    response.raise_for_status()
+                    st.write(f"API Response Status: {response.status_code}")  # Debug
+                    if response.status_code != 200:
+                        st.warning(f"API Error: {response.text}")
+                        continue
+
                     data = response.json()
+                    st.write(f"API Response Items: {len(data.get('items', []))}")  # Debug
 
                     items_key = "items"
                     if items_key not in data or not data[items_key]:
@@ -383,9 +413,9 @@ class SmartJobRecommenderRAG:
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships in {location}")
 
             return {
-                "jobs": unique_jobs[:12],
-                "internships": unique_internships[:8],
-                "search_queries": search_queries[:4]
+                "jobs": unique_jobs[:20],
+                "internships": unique_internships[:10],
+                "search_queries": search_queries[:8]
             }
 
         except Exception as e:
@@ -434,17 +464,18 @@ class SmartJobRecommenderRAG:
             if skill in desc_lower:
                 found_skills.append(skill.title())
 
-        return list(set(found_skills))[:8]
+        return list(set(found_skills))[:10]
 
     def remove_duplicates(self, jobs: List[Dict]) -> List[Dict]:
-        """Remove duplicate jobs based on title and company"""
+        """Remove duplicate jobs based on apply_link, title, and company"""
         seen = set()
         unique_jobs = []
 
         for job in jobs:
+            apply_link = (job.get("apply_link") or "").lower()
             title = (job.get("title") or "").lower()
             company = (job.get("company") or "").lower()
-            key = (title, company)
+            key = (apply_link, title, company) if apply_link else (title, company)
             if key not in seen:
                 seen.add(key)
                 unique_jobs.append(job)
@@ -457,7 +488,7 @@ class SmartJobRecommenderRAG:
 
 def main():
     """Main application function"""
-    st.write("Script Version: 2.4 (Custom Search API)")  # Debug
+    st.write("Script Version: 2.5 (Custom Search API)")  # Debug
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
@@ -610,7 +641,7 @@ RESUME CONTENT:
 
 Extract:
 1. Technical skills (programming languages, frameworks, tools)
-2. Soft skills 
+2. Soft skills
 3. Job preferences or career interests
 4. Experience level
 
@@ -623,6 +654,7 @@ EXPERIENCE_LEVEL: [entry/mid/senior]
         status_text.text("🤖 Analyzing with Gemini AI...")
         progress_bar.progress(80)
         extracted_data = rag_system.call_direct_gemini(final_prompt)
+        st.write(f"Extracted Data: {extracted_data}")  # Debug
 
         status_text.text("🔍 Searching for matching jobs...")
         progress_bar.progress(90)
@@ -656,6 +688,7 @@ def process_manual_skills_and_find_jobs(manual_data: Dict[str, Any], location_pr
         progress_bar.progress(20)
 
         st.success(f"✅ Skills processed: {len(manual_data['skills'])} skills found")
+        st.write(f"Manual Input Data: {manual_data}")  # Debug
 
         status_text.text("🔍 Searching for matching jobs...")
         progress_bar.progress(60)
@@ -789,11 +822,10 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
     if not jobs and not internships:
         st.info("🔍 No job matches found. This could be due to:")
         st.markdown("""
-        - API configuration issues
-        - No matching jobs available
-        - Skills extraction needs improvement
-
-        Please check your API keys and try again.
+        - API configuration issues (check GOOGLE_API_KEY and SEARCH_ENGINE_ID)
+        - Limited results from job sites (try broader queries or more skills)
+        - CSE not configured to search the entire web
+        - Quota limits reached (check Google Cloud Console)
         """)
 
 # ============================================================================
