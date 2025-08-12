@@ -492,7 +492,7 @@ def main():
     background_css = """
     <style>
     .stApp {
-        background-image: url("https://getwallpapers.com/wallpaper/full/c/d/f/495677.jpg");  /* Replace with your image URL */
+        background-image: url("");  /* Replace with your image URL */https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
