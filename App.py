@@ -535,19 +535,19 @@ class SmartJobRecommenderRAG:
 #         background-attachment: fixed;
 #         background-repeat: repeat;
 #     }
-#     /* Improve text readability for main app */
-#     .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
-#         color: #000000;  /* Black text for contrast */
-#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Minimal shadow for readability */
-#     }
-#     /* Set sidebar background to white with black text */
-#     .stSidebar {
-#         background-color: #FFFFFF;
-#     }
-#     .stSidebar * {
-#         color: #000000;
-#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
-#     }
+    # /* Improve text readability for main app */
+    # .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
+    #     color: #000000;  /* Black text for contrast */
+    #     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Minimal shadow for readability */
+    # }
+    # /* Set sidebar background to white with black text */
+    # .stSidebar {
+    #     background-color: #FFFFFF;
+    # }
+    # .stSidebar * {
+    #     color: #000000;
+    #     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
+    # }
     
 
     
@@ -608,23 +608,23 @@ def main():
         border: 2px dashed #CCCCCC !important;
         border-radius: 8px !important;
         padding: 20px !important;
-        color: #000000 !important;
+        color: #FFFFFF !important;
     }
 
-    # /* Browse files button */
+    /* Browse files button */
     
-    # [data-testid="stFileUploaderBrowseButton"] > div:first-child {
-    #     background-color: ##D3D3D3 !important;
-    #     color: #000000 !important;
-    #     border: 1px solid #CCCCCC !important;
-    #     border-radius: 5px !important;
-    #     padding: 4px 12px !important;
-    # }
+    [data-testid="stFileUploaderBrowseButton"] > div:first-child {
+        background-color: ##D3D3D3 !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 5px !important;
+        padding: 4px 12px !important;
+    }
     
-    # [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
-    #     background-color: ##D3D3D3 !important;
-    #     color: #FFFFFF !important;
-    # }
+    [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
+        background-color: ##D3D3D3 !important;
+        color: #FFFFFF !important;
+    }
 
     /* Top navigation bar */
     header[data-testid="stHeader"] {
