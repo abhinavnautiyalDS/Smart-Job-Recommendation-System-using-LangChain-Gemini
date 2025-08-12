@@ -2,23 +2,24 @@
 Smart Job Recommender - Streamlit Cloud Deployment Version
 =============================================
 
-Updated version using Google Jobs Search API instead of SerpAPI.
+Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
+Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
 Main changes:
-- Replaced SerpAPI with Google Jobs Search API for job search functionality.
-- Maintained robust apply-link handling and other bug fixes from v2.1.
-- Updated configuration to use Google Jobs Search API key.
-- Adapted response parsing for Google Jobs Search API format.
+- Replaced Google Jobs Search API with Google Custom Search JSON API.
+- Uses GOOGLE_API_KEY and SEARCH_ENGINE_ID from Streamlit secrets.
+- Simplified result parsing for web search results.
+- Removed unused pandas import.
+- Updated google-generativeai import to 'genai' for v0.8.0.
+- Added fallback for pypdf text extraction for v5.9.0.
 
 Author: AI Assistant (updated)
-Version: 2.2 (Google Jobs API)
+Version: 2.4 (Custom Search API)
 """
 
 import streamlit as st
-import pandas as pd
 import requests
 import time
-import json
 import os
 from typing import List, Dict, Any
 import tempfile
@@ -26,24 +27,23 @@ from urllib.parse import quote_plus
 
 # Import AI libraries with error handling
 try:
-    import google.generativeai as genai_old
+    import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    st.error("Google Generative AI not available. Please install: pip install google-generativeai")
+    st.error("Google Generative AI not available. Please install: pip install google-generativeai==0.8.0")
 
 try:
     from pypdf import PdfReader
     PYPDF_AVAILABLE = True
 except ImportError:
     PYPDF_AVAILABLE = False
-    st.error("PyPDF not available. Please install: pip install pypdf")
+    st.error("PyPDF not available. Please install: pip install pypdf==5.9.0")
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
 
-# Page configuration
 st.set_page_config(
     page_title="Smart Job Recommender",
     page_icon="💼",
@@ -65,7 +65,6 @@ class SmartJobRecommenderRAG:
     def initialize_gemini(self) -> bool:
         """Initialize Gemini AI client"""
         try:
-            # Get API key from Streamlit secrets or environment
             try:
                 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
             except Exception:
@@ -73,8 +72,8 @@ class SmartJobRecommenderRAG:
 
             if gemini_key and GEMINI_AVAILABLE:
                 try:
-                    genai_old.configure(api_key=gemini_key)
-                    self.gemini_client = genai_old.GenerativeModel('gemini-1.5-flash')
+                    genai.configure(api_key=gemini_key)
+                    self.gemini_client = genai.GenerativeModel('gemini-1.5-flash')
                     st.success("AI system initialized successfully")
                     return True
                 except Exception as e:
@@ -102,7 +101,8 @@ class SmartJobRecommenderRAG:
             reader = PdfReader(temp_file_path)
 
             for page_num, page in enumerate(reader.pages):
-                text = page.extract_text() if hasattr(page, 'extract_text') else None
+                # Try new extract_text_lines() first, fall back to extract_text()
+                text = page.extract_text_lines() if hasattr(page, 'extract_text_lines') else page.extract_text() if hasattr(page, 'extract_text') else None
                 if text and text.strip():
                     doc_obj = type('Document', (), {
                         'page_content': text,
@@ -129,7 +129,7 @@ class SmartJobRecommenderRAG:
 
         try:
             response = self.gemini_client.generate_content(prompt)
-            response_text = getattr(response, 'text', str(response))
+            response_text = response.text  # Updated for google-generativeai==0.8.0
 
             skills = []
             job_interests = []
@@ -171,7 +171,7 @@ class SmartJobRecommenderRAG:
     def get_best_apply_link(self, job: Dict[str, Any], response_data: Dict[str, Any] = None) -> str:
         """Try many possible fields for an application/website link"""
         candidates = [
-            'apply_link', 'application_link', 'apply_url', 'url', 'link', 'job_posting_url',
+            'link', 'url', 'apply_link', 'application_link', 'apply_url', 'job_posting_url',
             'canonical_url', 'destination', 'job_link', 'website', 'company_website', 'company_url'
         ]
 
@@ -197,20 +197,20 @@ class SmartJobRecommenderRAG:
 
         return ""
 
-    def search_jobs_with_google_jobs_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
-        """Search jobs using Google Jobs Search API"""
+    def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
+        """Search jobs using Google Custom Search JSON API"""
         try:
-            # Get Google Jobs API key
             try:
-                google_jobs_key = st.secrets.get("GOOGLE_JOBS_API_KEY") or os.environ.get("GOOGLE_JOBS_API_KEY")
+                google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
             except Exception:
-                google_jobs_key = os.environ.get("GOOGLE_JOBS_API_KEY")
+                google_api_key = os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
 
-            if not google_jobs_key:
-                st.error("❌ Google Jobs API key required. Please add GOOGLE_JOBS_API_KEY to your Streamlit secrets.")
+            if not google_api_key or not search_engine_id:
+                st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
                 return {"jobs": [], "internships": [], "search_queries": []}
 
-            # Create search queries
             search_queries = []
             if skills:
                 primary_skills = skills[:2]
@@ -230,48 +230,39 @@ class SmartJobRecommenderRAG:
             all_jobs = []
             all_internships = []
 
-            # Google Jobs API endpoint (example using RapidAPI; adjust as per your provider)
-            url = "https://google-jobs-search.p.rapidapi.com/v1/search"
-
-            headers = {
-                "X-RapidAPI-Key": google_jobs_key,
-                "X-RapidAPI-Host": "google-jobs-search.p.rapidapi.com"
-            }
+            url = "https://www.googleapis.com/customsearch/v1"
 
             for query in search_queries[:3]:
                 try:
                     params = {
-                        "query": query,
-                        "location": "United States",
-                        "language": "en",
-                        "limit": 8
+                        "key": google_api_key,
+                        "cx": search_engine_id,
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com",  # Restrict to job sites
+                        "num": 8
                     }
 
-                    st.info(f"🔍 Searching Google Jobs for '{query}'...")
+                    st.info(f"🔍 Searching Google Custom Search for '{query}'...")
 
-                    response = requests.get(url, headers=headers, params=params, timeout=15)
+                    response = requests.get(url, params=params, timeout=15)
                     response.raise_for_status()
                     data = response.json()
 
-                    # Adjust based on actual API response structure
-                    jobs_key = "jobs"  # Update this based on your API's response structure
-                    if jobs_key not in data or not data[jobs_key]:
+                    items_key = "items"
+                    if items_key not in data or not data[items_key]:
                         st.warning(f"No results found for query: {query}")
                         continue
 
-                    for job in data[jobs_key]:
-                        apply_link = self.get_best_apply_link(job, response_data=data)
-
+                    for item in data[items_key]:
                         job_data = {
-                            "title": job.get("title", "Unknown Title") or "Unknown Title",
-                            "company": job.get("company_name", job.get("company", "Unknown Company")) or "Unknown Company",
-                            "location": job.get("location", "Unknown Location") or "Unknown Location",
-                            "description": job.get("description", job.get("snippet", "No description")) or "No description",
-                            "apply_link": apply_link,
-                            "salary": job.get("salary", job.get("salary_range", "Not specified")) or "Not specified",
-                            "source": "Google Jobs",
-                            "match_score": self.calculate_match_score(skills, job.get("description", job.get("snippet", ""))),
-                            "required_skills": self.extract_skills_from_description(job.get("description", job.get("snippet", "")))
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                            "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
+                            "description": item.get("snippet", "No description") or "No description",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": "Not specified",  # Custom Search doesn't provide salary
+                            "source": "Google Custom Search",
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
                         }
 
                         title_lower = (job_data["title"] or "").lower()
@@ -283,7 +274,7 @@ class SmartJobRecommenderRAG:
                     time.sleep(0.5)
 
                 except Exception as e:
-                    st.warning(f"⚠️ Error searching Google Jobs: {str(e)}")
+                    st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
                     continue
 
             unique_jobs = self.remove_duplicates(all_jobs)
@@ -304,16 +295,18 @@ class SmartJobRecommenderRAG:
             st.error(f"❌ Error with job search: {e}")
             return {"jobs": [], "internships": [], "search_queries": []}
 
-    def search_jobs_with_google_jobs_api_location(self, skills: List[str], job_interests: List[str], location: str) -> Dict[str, List]:
-        """Search jobs with location preference using Google Jobs Search API"""
+    def search_jobs_with_custom_search_api_location(self, skills: List[str], job_interests: List[str], location: str) -> Dict[str, List]:
+        """Search jobs with location preference using Google Custom Search JSON API"""
         try:
             try:
-                google_jobs_key = st.secrets.get("GOOGLE_JOBS_API_KEY") or os.environ.get("GOOGLE_JOBS_API_KEY")
+                google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
             except Exception:
-                google_jobs_key = os.environ.get("GOOGLE_JOBS_API_KEY")
+                google_api_key = os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
 
-            if not google_jobs_key:
-                st.error("❌ Google Jobs API key required. Please add GOOGLE_JOBS_API_KEY to your Streamlit secrets.")
+            if not google_api_key or not search_engine_id:
+                st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
                 return {"jobs": [], "internships": [], "search_queries": []}
 
             search_queries = []
@@ -335,46 +328,39 @@ class SmartJobRecommenderRAG:
             all_jobs = []
             all_internships = []
 
-            url = "https://google-jobs-search.p.rapidapi.com/v1/search"
-
-            headers = {
-                "X-RapidAPI-Key": google_jobs_key,
-                "X-RapidAPI-Host": "google-jobs-search.p.rapidapi.com"
-            }
+            url = "https://www.googleapis.com/customsearch/v1"
 
             for query in search_queries[:3]:
                 try:
                     params = {
-                        "query": query,
-                        "location": location,
-                        "language": "en",
-                        "limit": 8
+                        "key": google_api_key,
+                        "cx": search_engine_id,
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com",
+                        "num": 8
                     }
 
-                    st.info(f"🔍 Searching Google Jobs in {location} for '{query}'...")
+                    st.info(f"🔍 Searching Google Custom Search in {location} for '{query}'...")
 
-                    response = requests.get(url, headers=headers, params=params, timeout=15)
+                    response = requests.get(url, params=params, timeout=15)
                     response.raise_for_status()
                     data = response.json()
 
-                    jobs_key = "jobs"  # Update this based on your API's response structure
-                    if jobs_key not in data or not data[jobs_key]:
+                    items_key = "items"
+                    if items_key not in data or not data[items_key]:
                         st.warning(f"No results found for query: {query}")
                         continue
 
-                    for job in data[jobs_key]:
-                        apply_link = self.get_best_apply_link(job, response_data=data)
-
+                    for item in data[items_key]:
                         job_data = {
-                            "title": job.get("title", "Unknown Title") or "Unknown Title",
-                            "company": job.get("company_name", job.get("company", "Unknown Company")) or "Unknown Company",
-                            "location": job.get("location", location) or location,
-                            "description": job.get("description", job.get("snippet", "No description")) or "No description",
-                            "apply_link": apply_link,
-                            "salary": job.get("salary", job.get("salary_range", "Not specified")) or "Not specified",
-                            "source": "Google Jobs",
-                            "match_score": self.calculate_match_score(skills, job.get("description", job.get("snippet", ""))),
-                            "required_skills": self.extract_skills_from_description(job.get("description", job.get("snippet", "")))
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                            "location": location,  # Use provided location as fallback
+                            "description": item.get("snippet", "No description") or "No description",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": "Not specified",
+                            "source": "Google Custom Search",
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
                         }
 
                         title_lower = (job_data["title"] or "").lower()
@@ -386,7 +372,7 @@ class SmartJobRecommenderRAG:
                     time.sleep(0.5)
 
                 except Exception as e:
-                    st.warning(f"⚠️ Error searching Google Jobs: {str(e)}")
+                    st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
                     continue
 
             unique_jobs = self.remove_duplicates(all_jobs)
@@ -472,7 +458,6 @@ class SmartJobRecommenderRAG:
 
 def main():
     """Main application function"""
-
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
@@ -494,20 +479,21 @@ def main():
             st.error("❌ Gemini AI: API key required")
 
         try:
-            google_jobs_key = st.secrets.get("GOOGLE_JOBS_API_KEY") or os.environ.get("GOOGLE_JOBS_API_KEY")
-            if google_jobs_key:
-                st.success("✅ Google Jobs API: Connected")
+            google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
+            if google_api_key and search_engine_id:
+                st.success("✅ Google Custom Search: Connected")
             else:
-                st.error("❌ Google Jobs API: API key required")
+                st.error("❌ Google Custom Search: API key and Search Engine ID required")
         except Exception:
-            st.error("❌ Google Jobs API: API key required")
+            st.error("❌ Google Custom Search: API key and Search Engine ID required")
 
         st.markdown("---")
         st.subheader("📋 Instructions")
         st.markdown("""
         **Setup Required:**
         1. Add GEMINI_API_KEY to Streamlit secrets
-        2. Add GOOGLE_JOBS_API_KEY to Streamlit secrets
+        2. Add GOOGLE_API_KEY and SEARCH_ENGINE_ID to Streamlit secrets
 
         **How to Use:**
         1. Upload your resume PDF, OR
@@ -521,7 +507,7 @@ def main():
         st.markdown("""
         - Resume PDF analysis
         - Manual skill entry
-        - Real-time job search via Google Jobs
+        - Real-time job search via Google Custom Search
         - Real-time matching scores
         - Clickable application links
         - Location-based search
@@ -640,7 +626,7 @@ EXPERIENCE_LEVEL: [entry/mid/senior]
 
         status_text.text("🔍 Searching for matching jobs...")
         progress_bar.progress(90)
-        job_results = rag_system.search_jobs_with_google_jobs_api(
+        job_results = rag_system.search_jobs_with_custom_search_api(
             extracted_data["skills"],
             extracted_data["job_interests"]
         )
@@ -675,13 +661,13 @@ def process_manual_skills_and_find_jobs(manual_data: Dict[str, Any], location_pr
         progress_bar.progress(60)
 
         if location_pref.strip():
-            job_results = rag_system.search_jobs_with_google_jobs_api_location(
+            job_results = rag_system.search_jobs_with_custom_search_api_location(
                 manual_data["skills"],
                 manual_data["job_interests"],
                 location_pref
             )
         else:
-            job_results = rag_system.search_jobs_with_google_jobs_api(
+            job_results = rag_system.search_jobs_with_custom_search_api(
                 manual_data["skills"],
                 manual_data["job_interests"]
             )
