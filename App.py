@@ -493,7 +493,7 @@ def main():
     <style>
     .stApp {
     
-        background-image: url("https://unsplash.com/photos/GmlMtdSfmVU");  /* Replace with your image URL */
+        background-image: url("https://getwallpapers.com/wallpaper/full/8/b/1/451270.jpg");  /* Replace with your image URL */
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
