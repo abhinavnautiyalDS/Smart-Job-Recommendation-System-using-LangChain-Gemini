@@ -5,16 +5,16 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.5):
+Main changes (v2.6):
+- Added background image via CSS.
 - Expanded search queries for diversity.
 - Relaxed duplicate removal using apply_link.
 - Added debug output for API responses and queries.
 - Increased result limit to 10 per query.
 - Enhanced error handling for empty results.
-- Kept compatibility with provided secrets.
 
 Author: AI Assistant (updated)
-Version: 2.5 (Custom Search API)
+Version: 2.6 (Custom Search API with Background Image)
 """
 
 import streamlit as st
@@ -141,7 +141,7 @@ class SmartJobRecommenderRAG:
                     skills = [s.strip() for s in skills_text.split(',') if s.strip()]
                 elif line.startswith('JOB_INTERESTS:'):
                     interests_text = line.replace('JOB_INTERESTS:', '').strip()
-                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]
+                    job_interests = [i.strip() for i in interests_text.split(',') if s.strip()]
                 elif line.startswith('EXPERIENCE_LEVEL:'):
                     experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
 
@@ -488,7 +488,41 @@ class SmartJobRecommenderRAG:
 
 def main():
     """Main application function"""
-    st.write("Script Version: 2.5 (Custom Search API)")  # Debug
+    # Add background image CSS
+    background_css = """
+    <style>
+    .stApp {
+        background-image: url("https://getwallpapers.com/wallpaper/full/8/9/6/1444490-color-backgrounds-3840x2160-for-macbook.jpg");  /* Replace with your image URL */
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+    }
+    /* Improve text readability */
+    .stApp * {
+        color: #ffffff;  /* White text for contrast */
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);  /* Text shadow for readability */
+    }
+    /* Ensure sidebar text is readable */
+    .stSidebar * {
+        color: #ffffff;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+    /* Optional: Style buttons for better visibility */
+    .stButton>button {
+        background-color: #1e90ff;
+        color: white;
+        border-radius: 5px;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #4682b4;
+    }
+    </style>
+    """
+    st.markdown(background_css, unsafe_allow_html=True)
+
+    st.write("Script Version: 2.6 (Custom Search API with Background Image)")  # Debug
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
