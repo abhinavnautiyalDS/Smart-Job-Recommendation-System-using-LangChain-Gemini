@@ -492,7 +492,8 @@ def main():
     background_css = """
     <style>
     .stApp {
-        background-image: #FFFFFF
+    
+        background-image: url("https://unsplash.com/photos/GmlMtdSfmVU");  /* Replace with your image URL */
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
