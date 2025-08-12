@@ -562,61 +562,7 @@ def main():
     """
     st.markdown(background_css, unsafe_allow_html=True)
 
-    st.write("Script Version: 2.6 (Custom Search API with White Background)")  # Debug
-    if "rag_system" not in st.session_state:
-        st.session_state.rag_system = SmartJobRecommenderRAG()
-
-    st.title("💼 Smart Job Recommender")
-    st.markdown("### AI-Powered Job Matching with Real-Time Search")
-    st.markdown("---")
-
-    with st.sidebar:
-        st.header("🔧 Configuration")
-        st.subheader("API Status")
-
-        try:
-            gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-            if gemini_key:
-                st.success("✅ Gemini AI: Connected")
-            else:
-                st.error("❌ Gemini AI: API key required")
-        except Exception:
-            st.error("❌ Gemini AI: API key required")
-
-        try:
-            google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
-            if google_api_key and search_engine_id:
-                st.success("✅ Google Custom Search: Connected")
-            else:
-                st.error("❌ Google Custom Search: API key and Search Engine ID required")
-        except Exception:
-            st.error("❌ Google Custom Search: API key and Search Engine ID required")
-
-        st.markdown("---")
-        st.subheader("📋 Instructions")
-        st.markdown("""
-        **Setup Required:**
-        1. Add GEMINI_API_KEY to Streamlit secrets
-        2. Add GOOGLE_API_KEY and SEARCH_ENGINE_ID to Streamlit secrets
-
-        **How to Use:**
-        1. Upload your resume PDF, OR
-        2. Enter your skills manually
-        3. Get personalized job recommendations
-        4. Click 'Apply Now' to apply directly
-        """)
-
-        st.markdown("---")
-        st.subheader("🎯 Features")
-        st.markdown("""
-        - Resume PDF analysis
-        - Manual skill entry
-        - Real-time job search via Google Custom Search
-        - Real-time matching scores
-        - Clickable application links
-        - Location-based search
-        """)
+    
 #-----------------
 
     if "rag_system" not in st.session_state:
