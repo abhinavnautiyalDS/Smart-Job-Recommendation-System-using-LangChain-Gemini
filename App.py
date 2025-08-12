@@ -500,17 +500,17 @@ def main():
     }
     /* Improve text readability */
     .stApp * {
-        color: #31333F;  /* White text for contrast */
+        color: #000000;  /* black text for contrast */
         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Text shadow for readability */
     }
     /* Ensure sidebar text is readable */
     .stSidebar * {
-        color: #31333F;
+        color: #000000;
         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
     }
     /* Optional: Style buttons for better visibility */
     .stButton>button {
-        background-color: #1e90ff;
+        background-color: #FFFFFF;
         color: white;
         border-radius: 5px;
         border: none;
