@@ -101,7 +101,6 @@ class SmartJobRecommenderRAG:
             reader = PdfReader(temp_file_path)
 
             for page_num, page in enumerate(reader.pages):
-                # Try new extract_text_lines() first, fall back to extract_text()
                 text = page.extract_text_lines() if hasattr(page, 'extract_text_lines') else page.extract_text() if hasattr(page, 'extract_text') else None
                 if text and text.strip():
                     doc_obj = type('Document', (), {
@@ -237,7 +236,7 @@ class SmartJobRecommenderRAG:
                     params = {
                         "key": google_api_key,
                         "cx": search_engine_id,
-                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com",  # Restrict to job sites
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com",
                         "num": 8
                     }
 
@@ -259,7 +258,7 @@ class SmartJobRecommenderRAG:
                             "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
                             "description": item.get("snippet", "No description") or "No description",
                             "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": "Not specified",  # Custom Search doesn't provide salary
+                            "salary": "Not specified",
                             "source": "Google Custom Search",
                             "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
                             "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
@@ -354,7 +353,7 @@ class SmartJobRecommenderRAG:
                         job_data = {
                             "title": item.get("title", "Unknown Title") or "Unknown Title",
                             "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
-                            "location": location,  # Use provided location as fallback
+                            "location": location,
                             "description": item.get("snippet", "No description") or "No description",
                             "apply_link": self.get_best_apply_link(item, response_data=data),
                             "salary": "Not specified",
@@ -458,6 +457,7 @@ class SmartJobRecommenderRAG:
 
 def main():
     """Main application function"""
+    st.write("Script Version: 2.4 (Custom Search API)")  # Debug
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
