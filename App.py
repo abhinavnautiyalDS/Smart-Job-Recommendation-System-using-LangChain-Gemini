@@ -566,10 +566,9 @@ class SmartJobRecommenderRAG:
 #     st.markdown(background_css, unsafe_allow_html=True)
 def main():
     """Main application function"""
-    # Add background image CSS
     background_css = """
     <style>
-    /* Set background for entire app including top and browser file areas */
+    /* Set background for entire app */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
         background-size: cover;
@@ -578,13 +577,13 @@ def main():
         background-repeat: repeat;
     }
 
-    /* Improve text readability */
+    /* Text readability */
     .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
-        color: #000000 !important;  
+        color: #000000 !important;
         text-shadow: none !important;
     }
 
-    /* Sidebar styling */
+    /* Sidebar */
     .stSidebar {
         background-color: #FFFFFF !important;
     }
@@ -593,21 +592,43 @@ def main():
         text-shadow: none !important;
     }
 
-    /* Success banner (status messages) */
-    [data-testid="stNotification"] {
+    /* Success banner */
+    [data-testid="stNotification"], .stAlert {
         background-color: #DFF5E1 !important;
         color: #000000 !important;
         border-radius: 8px;
         padding: 8px 12px;
         font-weight: 500;
+        border: 1px solid #BEE3BE !important;
     }
 
-    /* File uploader styling */
+    /* File uploader box */
     [data-testid="stFileUploaderDropzone"] {
         background-color: #F8F9FA !important;
         border: 2px dashed #CCCCCC !important;
         border-radius: 8px !important;
         padding: 20px !important;
+        color: #000000 !important;
+    }
+
+    /* Browse files button */
+    [data-testid="stFileUploaderBrowse"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 5px !important;
+        padding: 5px 12px !important;
+    }
+    [data-testid="stFileUploaderBrowse"]:hover {
+        background-color: #EAEAEA !important;
+    }
+
+    /* Top navigation bar */
+    header[data-testid="stHeader"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    header[data-testid="stHeader"] * {
         color: #000000 !important;
     }
 
@@ -623,14 +644,13 @@ def main():
         background-color: #EAEAEA !important;
     }
 
-    /* Horizontal lines */
+    /* Lines */
     hr {
-        border-top: 1px solid #E0E0E0;
+        border-top: 1px solid #E0E0E0 !important;
     }
     </style>
     """
     st.markdown(background_css, unsafe_allow_html=True)
-
 
     
 #-----------------
