@@ -533,7 +533,7 @@ def main():
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        background-repeat: no-repeat;
+        background-repeat: repeat;
     }
     /* Improve text readability for main app */
     .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
@@ -550,7 +550,7 @@ def main():
     }
     /* Style buttons for better visibility against white background */
     .stButton>button {
-        background-color: #1e90ff;  /* Dodger blue for contrast */
+        background-color: ##D3D3D3;  /* Dodger blue for contrast */
         color: white;
         border-radius: 5px;
         border: none;
