@@ -492,7 +492,7 @@ def main():
     background_css = """
     <style>
     .stApp {
-        background-image: url("https://getwallpapers.com/wallpaper/full/8/9/6/1444490-color-backgrounds-3840x2160-for-macbook.jpg");  /* Replace with your image URL */
+        background-image: url("https://getwallpapers.com/wallpaper/full/c/d/f/495677.jpg");  /* Replace with your image URL */
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
