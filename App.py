@@ -612,24 +612,16 @@ def main():
     }
 
     /* Browse files button */
-    # [data-testid="stFileUploaderBrowse"] {
-    #     background-color: #FFFFFF !important;
-    #     color: #000000 !important;
-    #     border: 1px solid #CCCCCC !important;
-    #     border-radius: 5px !important;
-    #     padding: 5px 12px !important;
-    # }
-    # [data-testid="stFileUploaderBrowse"]:hover {
-    #     background-color: #EAEAEA !important;
-    # }
-    # [data-testid="stFileUploaderBrowseButton"] {
-    # background-color: #FFFFFF !important;
-    # color: #000000 !important;
-    # border: 1px solid #CCCCCC !important;
-    # border-radius: 5px !important;
-    # padding: 4px 12px !important;
-    # }
-    [data-testid="stFileUploaderBrowseButton"]:hover {
+    
+    [data-testid="stFileUploaderBrowseButton"] > div:first-child {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 5px !important;
+        padding: 4px 12px !important;
+    }
+    
+    [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
         background-color: #EAEAEA !important;
         color: #000000 !important;
     }
