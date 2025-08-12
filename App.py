@@ -517,7 +517,7 @@ def main():
         border: none;
     }
     .stButton>button:hover {
-        background-color: #4682b4;
+        background-color: #FFFFFF;
     }
     </style>
     """
