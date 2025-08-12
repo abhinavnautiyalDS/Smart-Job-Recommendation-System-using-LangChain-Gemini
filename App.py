@@ -506,7 +506,7 @@ def main():
     /* Ensure sidebar text is readable */
     .stSidebar * {
         color: #31333F;
-        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
     }
     /* Optional: Style buttons for better visibility */
     .stButton>button {
