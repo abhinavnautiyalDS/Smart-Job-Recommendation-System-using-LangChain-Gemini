@@ -532,7 +532,7 @@ def main():
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-color: #FFFFFF; /* White background */
-        background-image: None
+        background-image: None;
         color: #000000; /* Light black text for contrast */
     }
 
@@ -620,6 +620,7 @@ def main():
     }
     </style>
     """
+
     # Search input box styling
     st.markdown("""
     <style>
@@ -642,8 +643,6 @@ def main():
     [data-testid="stSelectbox"] div[data-baseweb="select"] * {
         color: black !important;
     }
-    </style>
-    """, unsafe_allow_html=True)
 
     /* Browse files button */
     [data-testid="stFileUploaderBrowseButton"] {
@@ -653,19 +652,21 @@ def main():
         border-radius: 5px !important;
         padding: 4px 12px !important;
     }
-    
     [data-testid="stFileUploaderBrowseButton"]:hover {
         background-color: #F0F0F0 !important;
         color: #000000 !important;
     }
+
     /* File uploader text inside drop area */
     [data-testid="stFileUploader"] section div {
         color: #000000 !important; /* black text */
     }
-
-
+    </style>
+    """, unsafe_allow_html=True)
 
     st.markdown(background_css, unsafe_allow_html=True)
+
+
 
 
 
