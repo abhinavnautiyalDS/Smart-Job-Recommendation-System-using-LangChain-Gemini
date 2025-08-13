@@ -133,24 +133,9 @@ https://github.com/user-attachments/assets/c391de19-c8e0-4796-8ba8-91b236de0879
 ## Folder / Code Structure
 
 Here’s how our project is organized:
-bash
-***
-project/
-│
-├── app.py                # Streamlit app - handles input and output
-├── utils/
-│   ├── pdf_reader.py     # Reads resume and extracts text
-│   ├── skill_extractor.py# Uses LangChain + Gemini to find skills
-│   ├── job_search.py     # Searches Google Jobs using Google Custom Search API 
-│   ├── match_score.py    # Calculates match percentage
-│
-├── prompts/
-│   ├── resume_analysis.txt   # Prompt template for Gemini
-│
-├── requirements.txt      # List of dependencies
-└── README.md             # Project documentation
 
-****
+<img width="986" height="536" alt="image" src="https://github.com/user-attachments/assets/59310454-4f4a-44e0-aeff-2a8f66d2e761" />
+
 
 
 ## ⚡ Challenges & How I Solved Them
