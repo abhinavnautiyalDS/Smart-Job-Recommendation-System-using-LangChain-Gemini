@@ -130,14 +130,6 @@ https://github.com/user-attachments/assets/a253b522-5eda-4302-a5b2-b2574137c127
 https://github.com/user-attachments/assets/c391de19-c8e0-4796-8ba8-91b236de0879
 
 
-## Folder / Code Structure
-
-Here’s how our project is organized:
-
-<img width="986" height="536" alt="image" src="https://github.com/user-attachments/assets/59310454-4f4a-44e0-aeff-2a8f66d2e761" />
-
-
-
 ## ⚡ Challenges & How I Solved Them
 
 1. **Parsing Resume Data Accurately**  
