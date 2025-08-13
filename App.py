@@ -121,39 +121,7 @@ class SmartJobRecommenderRAG:
             st.error(f"❌ Error loading PDF: {e}")
             return []
 
-    # def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
-    #     """Call Gemini directly for text analysis"""
-    #     if not self.gemini_client:
-    #         return {"skills": [], "job_interests": [], "experience_level": "entry"}
-
-    #     try:
-    #         response = self.gemini_client.generate_content(prompt)
-    #         response_text = response.text
-
-    #         skills = []
-    #         job_interests = []
-    #         experience_level = "entry"
-
-    #         lines = response_text.split('\n')
-    #         for line in lines:
-    #             if line.startswith('SKILLS:'):
-    #                 skills_text = line.replace('SKILLS:', '').strip()
-    #                 skills = [i.strip() for s in skills_text.split(',') if s.strip()]
-    #             elif line.startswith('JOB_INTERESTS:'):
-    #                 interests_text = line.replace('JOB_INTERESTS:', '').strip()
-    #                 job_interests = [i.strip() for i in interests_text.split(',') if s.strip()]
-    #             elif line.startswith('EXPERIENCE_LEVEL:'):
-    #                 experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
-
-    #         return {
-    #             "skills": skills[:10],
-    #             "job_interests": job_interests[:5],
-    #             "experience_level": experience_level
-    #         }
-
-    #     except Exception as e:
-    #         st.error(f"❌ Error calling Gemini: {e}")
-    #         return {"skills": [], "job_interests": [], "experience_level": "entry"}
+   
 
     def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
         """Call Gemini directly for text analysis"""
@@ -564,7 +532,7 @@ def main():
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-color: #FFFFFF; /* White background */
-        background-image: none; /* Remove any previous background image */
+        background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg"); 
         color: #333333; /* Light black text for contrast */
     }
 
@@ -655,139 +623,7 @@ def main():
     st.markdown(background_css, unsafe_allow_html=True)
 
 
-    # Add background image CSS
-    # background_css = """
-    # <style>
-    # /* Set background for entire app including top and browser file areas */
-    # body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-    #     background-image: url("https://wallpapercave.com/wp/wp8979276.jpg");
-    #     background-size: cover;
-    #     background-position: center;
-    #     background-attachment: fixed;
-    #     background-repeat: repeat;
-    # }
-    # /* Improve text readability for main app */
-    # .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
-    #     color: #000000;  /* Black text for contrast */
-    #     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Minimal shadow for readability */
-    # }
-    # /* Set sidebar background to white with black text */
-    # .stSidebar {
-    #     background-color: #FFFFFF;
-    # }
-    # .stSidebar * {
-    #     color: #000000;
-    #     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
-    # }
     
-
-    
-#     /* Style buttons for better visibility against white background */
-#     .stButton>button {
-#         background-color: #FFFFFF;  /* Dodger blue for contrast */
-#         color: white;
-#         border-radius: 5px;
-#         border: none;
-#     }
-#     .stButton>button:hover {
-#         background-color: #FFFFFF;  /* Steel blue on hover */
-#     }
-#     </style>
-#     """
-    # st.markdown(background_css, unsafe_allow_html=True)
-# def main():
-    # """Main application function"""
-    # background_css = """
-    # <style>
-    # /* Set background for entire app */
-    # body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-    #     background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
-    #     background-size: cover;
-    #     background-position: center;
-    #     background-attachment: fixed;
-    #     background-repeat: repeat;
-    # }
-
-    # /* Text readability */
-    # .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
-    #     color: #000000 !important;
-    #     text-shadow: none !important;
-    # }
-
-    # /* Sidebar */
-    # .stSidebar {
-    #     background-color: #FFFFFF !important;
-    # }
-    # .stSidebar * {
-    #     color: #000000 !important;
-    #     text-shadow: none !important;
-    # }
-
-    # /* Success banner */
-    # [data-testid="stNotification"], .stAlert {
-    #     background-color: #DFF5E1 !important;
-    #     color: #000000 !important;
-    #     border-radius: 8px;
-    #     padding: 8px 12px;
-    #     font-weight: 500;
-    #     border: 1px solid #BEE3BE !important;
-    # }
-
-    # /* File uploader box */
-    # [data-testid="stFileUploaderDropzone"] {
-    #     background-color: #F8F9FA !important;
-    #     border: 2px dashed #CCCCCC !important;
-    #     border-radius: 8px !important;
-    #     padding: 20px !important;
-    #     color: #FFFFFF !important;
-    # }
-
-    # /* Browse files button */
-    
-    # [data-testid="stFileUploaderBrowseButton"] > div:first-child {
-    #     background-color: ##D3D3D3 !important;
-    #     color: #000000 !important;
-    #     border: 1px solid #CCCCCC !important;
-    #     border-radius: 5px !important;
-    #     padding: 4px 12px !important;
-    # }
-    
-    # [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
-    #     background-color: ##D3D3D3 !important;
-    #     color: #FFFFFF !important;
-    # }
-
-    # /* Top navigation bar */
-    # header[data-testid="stHeader"] {
-    #     background-color: #FFFFFF !important;
-    #     color: #000000 !important;
-    # }
-    # header[data-testid="stHeader"] * {
-    #     color: #000000 !important;
-    # }
-
-    # /* Buttons */
-    # .stButton>button {
-    #     background-color: #FFFFFF !important;
-    #     color: #000000 !important;
-    #     border: 1px solid #CCCCCC !important;
-    #     border-radius: 5px !important;
-    #     padding: 8px 16px !important;
-    # }
-    # .stButton>button:hover {
-    #     background-color: #EAEAEA !important;
-    # }
-
-    # /* Lines */
-    # hr {
-    #     border-top: 1px solid #E0E0E0 !important;
-    # }
-    # </style>
-    # """
-    # st.markdown(background_css, unsafe_allow_html=True)
-
-    
-#-----------------
 
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
