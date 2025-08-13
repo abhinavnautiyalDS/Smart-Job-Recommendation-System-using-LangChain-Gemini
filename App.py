@@ -645,6 +645,9 @@ def main():
     </style>
 """, unsafe_allow_html=True)
 
+    st.markdown(background_css, unsafe_allow_html=True)
+
+
 
 
     
