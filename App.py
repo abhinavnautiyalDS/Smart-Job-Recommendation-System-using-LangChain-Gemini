@@ -627,7 +627,7 @@ def main():
     .stTextArea > div > div > textarea,
     .stSelectbox > div > div {
         background-color: #d3d3d3 !important; /* light grey */
-        color: white !important; /* white text */
+        color: #000000 !important; /* white text */
     }
 
     /* Placeholder text should also be white */
