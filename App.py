@@ -563,7 +563,7 @@ def main():
     <style>
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-        background-image: url("https://cdn.pixabay.com/photo/2020/03/08/14/45/creativity-4912654_1280.jpg");
+        background-image: url("https://wallpapercave.com/wp/wp8979276.jpg");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
