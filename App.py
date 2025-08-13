@@ -539,35 +539,35 @@ def main():
     /* Ensure sidebar matches light theme */
     .stSidebar {
         background-color: #FFFFFF; /* White sidebar */
-        color: #333333; /* Light black text */
+        color: #000000; /* Light black text */
     }
     .stSidebar * {
-        color: #333333;
+        color: #000000;
     }
 
     /* Improve text readability */
     .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
-        color: #333333; /* Consistent light black text */
+        color: #000000; /* Consistent light black text */
         text-shadow: none;
     }
 
     /* Style buttons with light grey background and light black text */
     .stButton>button {
         background-color: #D3D3D3; /* Light grey background */
-        color: #333333; /* Light black text */
+        color: #000000; /* Light black text */
         border: 1px solid #CCCCCC;
         border-radius: 5px;
         padding: 8px 16px;
     }
     .stButton>button:hover {
         background-color: #C0C0C0; /* Slightly darker grey on hover */
-        color: #333333;
+        color: #000000;
     }
 
     /* Success banner */
     [data-testid="stNotification"], .stAlert {
         background-color: #DFF5E1;
-        color: #333333;
+        color: #000000;
         border-radius: 8px;
         padding: 8px 12px;
         font-weight: 500;
