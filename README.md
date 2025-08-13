@@ -21,7 +21,7 @@ This project aims to build an AI-powered job recommendation web application that
 The app will use LangChain, Google’s Gemini LLM, and Retrieval-Augmented Generation (RAG) techniques to:
 
 - Understand the user’s skills, experience, and preferences from either a PDF resume or manual input.
-- Retrieve relevant job postings from Google Jobs or LinkedIn Jobs using SerpAPI.
+- Retrieve relevant job postings from Google Jobs or LinkedIn Jobs using Google Custom Search API .
 - Match and rank jobs based on skill relevance.
 - Provide short, personalized explanations for each recommendation.
 
