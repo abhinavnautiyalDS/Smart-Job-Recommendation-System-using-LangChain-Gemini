@@ -643,6 +643,7 @@ def main():
         color: black !important;
     }
     </style>
+    """, unsafe_allow_html=True)
 
     /* Browse files button */
     [data-testid="stFileUploaderBrowseButton"] {
@@ -662,7 +663,7 @@ def main():
         color: #000000 !important; /* black text */
     }
 
-""", unsafe_allow_html=True)
+
 
     st.markdown(background_css, unsafe_allow_html=True)
 
