@@ -138,7 +138,7 @@ class SmartJobRecommenderRAG:
             for line in lines:
                 if line.startswith('SKILLS:'):
                     skills_text = line.replace('SKILLS:', '').strip()
-                    skills = [s.strip() for s in skills_text.split(',') if s.strip()]
+                    skills = [i.strip() for s in skills_text.split(',') if s.strip()]
                 elif line.startswith('JOB_INTERESTS:'):
                     interests_text = line.replace('JOB_INTERESTS:', '').strip()
                     job_interests = [i.strip() for i in interests_text.split(',') if s.strip()]
