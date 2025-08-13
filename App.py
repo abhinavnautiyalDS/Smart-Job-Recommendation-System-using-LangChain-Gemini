@@ -622,26 +622,29 @@ def main():
     """
     # Search input box styling
     st.markdown("""
-        <style>
-        /* Text Input & Text Area */
-        [data-testid="stTextInput"] input,
-        [data-testid="stTextArea"] textarea {
-            background-color: #d3d3d3 !important;
-            color: black !important;
-        }
-        [data-testid="stTextInput"] input::placeholder,
-        [data-testid="stTextArea"] textarea::placeholder {
-            color: #555555 !important;
-        }
-    
-        /* Select Dropdown */
-        [data-testid="stSelectbox"] div[data-baseweb="select"] {
-            background-color: #d3d3d3 !important;
-            color: black !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    st.markdown(background_css, unsafe_allow_html=True)
+    <style>
+    /* Text Input & Text Area */
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea {
+        background-color: #d3d3d3 !important;
+        color: black !important;
+    }
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder {
+        color: #555555 !important;
+    }
+
+    /* Select Dropdown (Experience Level) */
+    [data-testid="stSelectbox"] div[data-baseweb="select"] {
+        background-color: #d3d3d3 !important;
+        color: black !important;
+    }
+    [data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: black !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 
 
     
