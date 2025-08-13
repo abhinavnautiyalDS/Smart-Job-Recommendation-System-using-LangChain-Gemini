@@ -130,6 +130,47 @@ https://github.com/user-attachments/assets/a253b522-5eda-4302-a5b2-b2574137c127
 https://github.com/user-attachments/assets/c391de19-c8e0-4796-8ba8-91b236de0879
 
 
+## Folder / Code Structure
+
+Here’s how our project is organized:
+bash
+
+project/
+│
+├── app.py                # Streamlit app - handles input and output
+├── utils/
+│   ├── pdf_reader.py     # Reads resume and extracts text
+│   ├── skill_extractor.py# Uses LangChain + Gemini to find skills
+│   ├── job_search.py     # Searches Google Jobs using Google Custom Search API 
+│   ├── match_score.py    # Calculates match percentage
+│
+├── prompts/
+│   ├── resume_analysis.txt   # Prompt template for Gemini
+│
+├── requirements.txt      # List of dependencies
+└── README.md             # Project documentation
+
+
+
+## ⚡ Challenges & How I Solved Them
+
+1. **Parsing Resume Data Accurately**  
+   - *Challenge:* Resumes come in different formats and layouts, making extraction tricky.  
+   - *Solution:* Used **PyPDF Loader** for consistent text extraction and avoided chunking for small text sizes.
+
+2. **Avoiding Irrelevant Job Results**  
+   - *Challenge:* Google Custom Search API sometimes returned unrelated links.  
+   - *Solution:* Fine-tuned search queries using extracted **skills** and **job titles** from Gemini AI output.
+
+3. **Fetching Jobs from Multiple Platforms**  
+   - *Challenge:* APIs for many job portals are paid or unavailable.  
+   - *Solution:* Leveraged **Google Custom Search API** to scrape results from LinkedIn, Indeed, Naukri, and Internshala in one request.
+
+4. **Maintaining Real-Time Job Listings**  
+   - *Challenge:* Many job listings go stale quickly.  
+   - *Solution:* Always query live data instead of storing results, ensuring users see only **fresh, active jobs**.
+   
+
 ## 🔮 Future Enhancements
 
 Here are some planned improvements and ideas to make **Smart Job Recommender** even more powerful:
