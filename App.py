@@ -532,7 +532,7 @@ def main():
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-color: #FFFFFF; /* White background */
-        background-image: url("https://github.com/abhinavnautiyalDS/Smart_Job_Recommender_Using_Langchain/blob/main/image.jpg");
+        background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");
         color: #000000; /* Light black text for contrast */
     }
 
