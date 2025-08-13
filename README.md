@@ -134,7 +134,7 @@ https://github.com/user-attachments/assets/c391de19-c8e0-4796-8ba8-91b236de0879
 
 Here’s how our project is organized:
 bash
-
+***
 project/
 │
 ├── app.py                # Streamlit app - handles input and output
@@ -150,6 +150,7 @@ project/
 ├── requirements.txt      # List of dependencies
 └── README.md             # Project documentation
 
+****
 
 
 ## ⚡ Challenges & How I Solved Them
