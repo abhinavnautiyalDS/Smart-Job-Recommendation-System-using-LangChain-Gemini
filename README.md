@@ -23,3 +23,13 @@ The app will use LangChain, Google’s Gemini LLM, and Retrieval-Augmented Gener
 - Provide short, personalized explanations for each recommendation.
 
 The application will be developed with Streamlit to deliver an interactive and user-friendly experience, making job searching smarter, faster, and more personalized.
+
+
+
+
+https://github.com/user-attachments/assets/a253b522-5eda-4302-a5b2-b2574137c127
+
+
+https://github.com/user-attachments/assets/c391de19-c8e0-4796-8ba8-91b236de0879
+
+
