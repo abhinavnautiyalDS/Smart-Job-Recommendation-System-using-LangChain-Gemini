@@ -93,7 +93,10 @@ The core concept behind building **Smart Job Recommender** was to create a **sea
 
 ## 🚀 How the App Works
 
+
 The **Smart Job Recommender** offers two simple ways for users to find relevant jobs:
+
+**APP LINK** : https://smartjobrecommenderusinglangchain-3r597cctohrhdbqvzubyd9.streamlit.app/
 
 ### 1️⃣ Upload Your Resume  
 - **Step 1:** Click the **"Upload Resume"** option on the homepage.  
@@ -114,8 +117,42 @@ https://github.com/user-attachments/assets/a253b522-5eda-4302-a5b2-b2574137c127
 https://github.com/user-attachments/assets/c391de19-c8e0-4796-8ba8-91b236de0879
 
 
+## 🔮 Future Enhancements
+
+Here are some planned improvements and ideas to make **Smart Job Recommender** even more powerful:
+
+1. **Advanced Job Filtering**  
+   - Add filters for salary range, remote/hybrid/on-site preference, company size, and industry type.
+
+2. **User Profile & History**  
+   - Let users create accounts and save their job search history, shortlisted jobs, and application status.
+
+3. **Multiple Resume Support**  
+   - Allow users to upload and compare results from multiple resumes to see which one gets better matches.
+
+4. **AI-Powered Resume Feedback**  
+   - Provide automated suggestions to improve resumes before job searching.
+
+5. **More Job Sources**  
+   - Integrate APIs from platforms like Glassdoor, Monster, AngelList, and others.
+
+6. **Email Alerts**  
+   - Send daily or weekly job recommendations directly to a user’s inbox.
+
+7. **Job Application Tracker**  
+   - Help users keep track of which jobs they’ve applied for and their application status.
+
+8. **Multilingual Support**  
+   - Expand compatibility for resumes in different languages.
+
+
+## 🙏 Big Thanks for Reading!  
+Thank you for taking the time to explore **Smart Job Recommender**.  
+Your interest and support mean a lot — feel free to ⭐ the repo if you found it useful, and contributions are always welcome!
 
  
+
+
 
 
 
