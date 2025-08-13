@@ -645,22 +645,22 @@ def main():
     </style>
 
     /* Browse files button */
-[data-testid="stFileUploaderBrowseButton"] {
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    border: 1px solid #CCCCCC !important;
-    border-radius: 5px !important;
-    padding: 4px 12px !important;
-}
-
-[data-testid="stFileUploaderBrowseButton"]:hover {
-    background-color: #F0F0F0 !important;
-    color: #000000 !important;
-}
-/* File uploader text inside drop area */
-[data-testid="stFileUploader"] section div {
-    color: #000000 !important; /* black text */
-}
+    [data-testid="stFileUploaderBrowseButton"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 5px !important;
+        padding: 4px 12px !important;
+    }
+    
+    [data-testid="stFileUploaderBrowseButton"]:hover {
+        background-color: #F0F0F0 !important;
+        color: #000000 !important;
+    }
+    /* File uploader text inside drop area */
+    [data-testid="stFileUploader"] section div {
+        color: #000000 !important; /* black text */
+    }
 
 """, unsafe_allow_html=True)
 
