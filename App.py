@@ -563,7 +563,7 @@ def main():
     <style>
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
-        background-image: url("https://cdn.pixabay.com/photo/2017/02/20/21/30/turquoise-2083986_1280.jpg");
+        background-image: url("https://cdn.pixabay.com/photo/2017/09/12/11/56/universe-2742113_1280.jpg");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
