@@ -634,7 +634,7 @@ def main():
     }
     [data-testid="stTextInput"] input::placeholder,
     [data-testid="stTextArea"] textarea::placeholder {
-        color: #555555 !important;
+        color: #000000 !important;
     }
 
     /* Select Dropdown (Experience Level) */
