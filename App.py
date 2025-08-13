@@ -558,6 +558,92 @@ class SmartJobRecommenderRAG:
 #     st.markdown(background_css, unsafe_allow_html=True)
 def main():
     """Main application function"""
+    # Add background image CSS for light theme
+    background_css = """
+    <style>
+    /* Set background for entire app including top and browser file areas */
+    body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
+        background-color: #FFFFFF; /* White background */
+        background-image: none; /* Remove any previous background image */
+        color: #333333; /* Light black text for contrast */
+    }
+
+    /* Ensure sidebar matches light theme */
+    .stSidebar {
+        background-color: #FFFFFF; /* White sidebar */
+        color: #333333; /* Light black text */
+    }
+    .stSidebar * {
+        color: #333333;
+    }
+
+    /* Improve text readability */
+    .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
+        color: #333333; /* Consistent light black text */
+        text-shadow: none;
+    }
+
+    /* Style buttons with light grey background and light black text */
+    .stButton>button {
+        background-color: #D3D3D3; /* Light grey background */
+        color: #333333; /* Light black text */
+        border: 1px solid #CCCCCC;
+        border-radius: 5px;
+        padding: 8px 16px;
+    }
+    .stButton>button:hover {
+        background-color: #C0C0C0; /* Slightly darker grey on hover */
+        color: #333333;
+    }
+
+    /* Success banner */
+    [data-testid="stNotification"], .stAlert {
+        background-color: #DFF5E1;
+        color: #333333;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-weight: 500;
+        border: 1px solid #BEE3BE;
+    }
+
+    /* File uploader box */
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #F8F9FA;
+        border: 2px dashed #CCCCCC;
+        border-radius: 8px;
+        padding: 20px;
+        color: #333333;
+    }
+
+    /* Browse files button */
+    [data-testid="stFileUploaderBrowseButton"] > div:first-child {
+        background-color: #D3D3D3;
+        color: #333333;
+        border: 1px solid #CCCCCC;
+        border-radius: 5px;
+        padding: 4px 12px;
+    }
+    [data-testid="stFileUploaderBrowseButton"] > div:first-child:hover {
+        background-color: #C0C0C0;
+        color: #333333;
+    }
+
+    /* Top navigation bar */
+    header[data-testid="stHeader"] {
+        background-color: #FFFFFF;
+        color: #333333;
+    }
+    header[data-testid="stHeader"] * {
+        color: #333333;
+    }
+
+    /* Lines */
+    hr {
+        border-top: 1px solid #E0E0E0;
+    }
+    </style>
+    """
+    st.markdown(background_css, unsafe_allow_html=True)
     # Add background image CSS
     # background_css = """
     # <style>
