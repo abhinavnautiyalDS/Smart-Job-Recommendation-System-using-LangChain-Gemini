@@ -623,20 +623,24 @@ def main():
     # Search input box styling
     st.markdown("""
         <style>
-        /* Input box styling */
-        [data-testid="stTextInput"] input {
-            color: #000000 !important;  /* Black text */
-            background-color: #FFFFFF !important; /* White background */
-            border: 1px solid #CCCCCC !important; /* Light grey border */
-            border-radius: 5px !important;
-            padding: 6px 10px !important;
+        /* Text Input & Text Area */
+        [data-testid="stTextInput"] input,
+        [data-testid="stTextArea"] textarea {
+            background-color: #d3d3d3 !important;
+            color: black !important;
         }
-        [data-testid="stTextInput"] input::placeholder {
-            color: #555555 !important;  /* Dark grey placeholder text */
+        [data-testid="stTextInput"] input::placeholder,
+        [data-testid="stTextArea"] textarea::placeholder {
+            color: #555555 !important;
+        }
+    
+        /* Select Dropdown */
+        [data-testid="stSelectbox"] div[data-baseweb="select"] {
+            background-color: #d3d3d3 !important;
+            color: black !important;
         }
         </style>
     """, unsafe_allow_html=True)
-
     st.markdown(background_css, unsafe_allow_html=True)
 
 
