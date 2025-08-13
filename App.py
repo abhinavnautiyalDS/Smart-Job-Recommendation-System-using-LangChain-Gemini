@@ -641,9 +641,20 @@ def main():
     hr {
         border-top: 1px solid #E0E0E0;
     }
+
+    /* Style selectbox (dropdown) to have white text */
+    .stSelectbox div[role="listbox"] * {
+        color: #FFFFFF !important;
+    }
+    .stSelectbox div[role="option"] {
+        color: #FFFFFF !important;
+        background-color: #333333; /* Dark background to contrast white text */
+    }
     </style>
     """
     st.markdown(background_css, unsafe_allow_html=True)
+
+
     # Add background image CSS
     # background_css = """
     # <style>
