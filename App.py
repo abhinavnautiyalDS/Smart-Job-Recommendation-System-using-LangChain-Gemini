@@ -532,7 +532,7 @@ def main():
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-color: #FFFFFF; /* White background */
-        background-image: url("image.jpg");
+        background-image: url("https://github.com/abhinavnautiyalDS/Smart_Job_Recommender_Using_Langchain/blob/main/image.jpg");
         color: #000000; /* Light black text for contrast */
     }
 
