@@ -620,6 +620,23 @@ def main():
     }
     </style>
     """
+    st.markdown("""
+    <style>
+    /* Target all text input and text area fields */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea,
+    .stSelectbox > div > div {
+        background-color: #d3d3d3 !important; /* light grey */
+        color: white !important; /* white text */
+    }
+
+    /* Placeholder text should also be white */
+    ::placeholder {
+        color: white !important;
+        opacity: 1; /* Ensure visibility */
+    }
+    </style>
+""", unsafe_allow_html=True)
     st.markdown(background_css, unsafe_allow_html=True)
 
 
