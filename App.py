@@ -121,6 +121,40 @@ class SmartJobRecommenderRAG:
             st.error(f"❌ Error loading PDF: {e}")
             return []
 
+    # def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
+    #     """Call Gemini directly for text analysis"""
+    #     if not self.gemini_client:
+    #         return {"skills": [], "job_interests": [], "experience_level": "entry"}
+
+    #     try:
+    #         response = self.gemini_client.generate_content(prompt)
+    #         response_text = response.text
+
+    #         skills = []
+    #         job_interests = []
+    #         experience_level = "entry"
+
+    #         lines = response_text.split('\n')
+    #         for line in lines:
+    #             if line.startswith('SKILLS:'):
+    #                 skills_text = line.replace('SKILLS:', '').strip()
+    #                 skills = [i.strip() for s in skills_text.split(',') if s.strip()]
+    #             elif line.startswith('JOB_INTERESTS:'):
+    #                 interests_text = line.replace('JOB_INTERESTS:', '').strip()
+    #                 job_interests = [i.strip() for i in interests_text.split(',') if s.strip()]
+    #             elif line.startswith('EXPERIENCE_LEVEL:'):
+    #                 experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
+
+    #         return {
+    #             "skills": skills[:10],
+    #             "job_interests": job_interests[:5],
+    #             "experience_level": experience_level
+    #         }
+
+    #     except Exception as e:
+    #         st.error(f"❌ Error calling Gemini: {e}")
+    #         return {"skills": [], "job_interests": [], "experience_level": "entry"}
+
     def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
         """Call Gemini directly for text analysis"""
         if not self.gemini_client:
@@ -138,10 +172,10 @@ class SmartJobRecommenderRAG:
             for line in lines:
                 if line.startswith('SKILLS:'):
                     skills_text = line.replace('SKILLS:', '').strip()
-                    skills = [i.strip() for s in skills_text.split(',') if s.strip()]
+                    skills = [s.strip() for s in skills_text.split(',') if s.strip()]
                 elif line.startswith('JOB_INTERESTS:'):
                     interests_text = line.replace('JOB_INTERESTS:', '').strip()
-                    job_interests = [i.strip() for i in interests_text.split(',') if s.strip()]
+                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]  # Fixed 's' to 'i'
                 elif line.startswith('EXPERIENCE_LEVEL:'):
                     experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
 
