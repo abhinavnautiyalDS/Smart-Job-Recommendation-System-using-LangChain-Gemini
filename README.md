@@ -91,17 +91,17 @@ The core concept behind building **Smart Job Recommender** was to create a **sea
   Direct application links
 
 
-1️⃣ Resume Upload / Manual Skills Entry 
+- 1️⃣ Resume Upload / Manual Skills Entry 
     ↓
-2️⃣ Gemini AI (Skill & Preference Extraction) 
+- 2️⃣ Gemini AI (Skill & Preference Extraction) 
     ↓
-3️⃣ Google Custom Search API 
+- 3️⃣ Google Custom Search API 
     ↓
-4️⃣ Job Platforms (LinkedIn, Naukri, Indeed, Internshala) 
+- 4️⃣ Job Platforms (LinkedIn, Naukri, Indeed, Internshala) 
     ↓
-5️⃣ Matching & Ranking Engine 
+- 5️⃣ Matching & Ranking Engine 
     ↓
-6️⃣ Streamlit UI (Job Results & Explanations)
+- 6️⃣ Streamlit UI (Job Results & Explanations)
 
 
 ## 🚀 How the App Works
