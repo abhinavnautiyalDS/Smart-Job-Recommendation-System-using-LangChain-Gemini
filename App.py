@@ -59,9 +59,9 @@ except ImportError:
 # Colab setup block
 if 'google.colab' in str(get_ipython()):
 #    !pip install -q -r requirements.txt
-    !apt-get update
-    !apt-get install -y chromium-chromedriver
-    !cp /usr/lib/chromium-browser/chromedriver /usr/bin
+    # !apt-get update
+    # !apt-get install -y chromium-chromedriver
+    # !cp /usr/lib/chromium-browser/chromedriver /usr/bin
 
 st.set_page_config(
     page_title="Smart Job Recommender",
