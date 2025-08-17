@@ -6,12 +6,13 @@ Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEAR
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
 Main changes (v2.8):
-- Updated CSS to match the screenshot styling: white background with subtle diagonal stripes, black text, red Apply Now button with white text.
-- Kept all previous improvements (automation, extraction, etc.).
-- Added subtle diagonal lines background using CSS linear-gradient.
+- Enhanced regex for extracting company, salary, and location from snippets to handle formats like "Company · Location".
+- Added automation on "Apply Now" click: Send job and user data to n8n webhook for cover letter generation and spreadsheet storage.
+- Fixed typos in code (e.g., list comprehension in call_direct_gemini).
+- Retained light theme and styling.
 
 Author: AI Assistant (updated)
-Version: 2.8 (Styled to Match Screenshot)
+Version: 2.8 (Improved Extraction and Automation)
 """
 
 import streamlit as st
@@ -21,7 +22,7 @@ import os
 from typing import List, Dict, Any
 import tempfile
 from urllib.parse import quote_plus
-import re  # For parsing salary and location
+import re  # For parsing salary, location, and company
 
 # Import AI libraries with error handling
 try:
@@ -202,15 +203,15 @@ class SmartJobRecommenderRAG:
 
     def extract_location_from_snippet(self, snippet: str) -> str:
         """Extract location from snippet"""
-        location_pattern = r'(Remote|Hybrid|On-site|[\w\s]+, \w{2}(?:, \w+)?)'
+        location_pattern = r'· ([\w\s,]+) \('
         match = re.search(location_pattern, snippet)
-        return match.group(0) if match else "Unknown Location"
+        return match.group(1) if match else "Unknown Location"
 
     def extract_company_from_snippet(self, snippet: str) -> str:
         """Extract company name from snippet if not available in metadata"""
-        company_pattern = r'(?:at|from|by)\s+([\w\s]+)(?:\.|,)'
+        company_pattern = r'(\w+) ·'
         match = re.search(company_pattern, snippet)
-        return match.group(1).strip() if match else "Unknown Company"
+        return match.group(1) if match else "Unknown Company"
 
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
         """Search jobs using Google Custom Search JSON API"""
@@ -983,4 +984,3 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
 
 if __name__ == "__main__":
     main()
-```
