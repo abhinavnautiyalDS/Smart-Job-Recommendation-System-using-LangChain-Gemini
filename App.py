@@ -1014,6 +1014,32 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
         - Quota limits reached (check Google Cloud Console)
         """)
 
+    ########
+    for i, job in enumerate(job_data):
+        with st.expander(f"{job['title']} at {job['company']}"):
+            st.write(f"**Location:** {job['location']}")
+            st.write(f"**Description:** {job['description']}")
+            st.write(f"**Match Score:** {job['match_score']:.2f}%")
+            st.write(f"**Link:** [{job['link']}]({job['link']})")
+            if st.button("🚀 Apply Now", key=f"apply_{i}"):
+                apply_data = {
+                    "company": job['company'],
+                    "job_title": job['title'],
+                    "location": job['location'],
+                    "job_description": job['description'],
+                    "user_skills": ','.join(extracted_data['skills']),
+                    "experience_level": extracted_data['experience_level']
+                }
+                import requests
+                n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your URL
+                response = requests.post(n8n_webhook_url, json=apply_data)
+                if response.status_code == 200:
+                    st.success("✅ Application logged and cover letter generated!")
+                else:
+                    st.error(f"❌ Error: {response.text}")
+
+
+
 # ============================================================================
 # RUN APPLICATION
 # ============================================================================
