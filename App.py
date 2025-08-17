@@ -5,15 +5,13 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.7):
-- Integrated Selenium for advanced web scraping to extract company, location, salary, and other details.
-- Added site-specific scraping selectors for Indeed, LinkedIn, Naukri, Internshala, etc.
-- Updated search queries to include additional job platforms (Naukri, Internshala).
-- Enhanced error handling for scraping.
-- Limited scraping to top results to improve performance.
+Main changes (v2.8):
+- Adapted for Google Colab with dynamic Chromedriver installation using webdriver-manager.
+- Enhanced Selenium configuration for headless execution in Colab.
+- Added setup block to install dependencies in Colab environment.
 
 Author: AI Assistant (updated)
-Version: 2.7 (With Selenium Web Scraping)
+Version: 2.8 (Colab-Compatible with Selenium)
 """
 
 import streamlit as st
@@ -39,7 +37,7 @@ except ImportError:
     PYPDF_AVAILABLE = False
     st.error("PyPDF not available. Please install: pip install pypdf==5.9.0")
 
-# Import Selenium for web scraping
+# Import Selenium and webdriver-manager for Colab
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
@@ -47,14 +45,23 @@ try:
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.common.exceptions import NoSuchElementException, TimeoutException
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.chrome.service import Service
     SELENIUM_AVAILABLE = True
 except ImportError:
     SELENIUM_AVAILABLE = False
-    st.error("Selenium not available. Please install: pip install selenium. Also, ensure Chrome and Chromedriver are installed.")
+    st.error("Selenium not available. Please install: pip install selenium webdriver-manager")
 
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
+
+# Colab setup block
+if 'google.colab' in str(get_ipython()):
+    !pip install -q -r requirements.txt
+    !apt-get update
+    !apt-get install -y chromium-chromedriver
+    !cp /usr/lib/chromium-browser/chromedriver /usr/bin
 
 st.set_page_config(
     page_title="Smart Job Recommender",
@@ -230,13 +237,16 @@ class SmartJobRecommenderRAG:
 
         try:
             options = Options()
-            options.add_argument("--headless=new")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
+            options.add_argument("--headless=new")  # Run in headless mode for Colab
+            options.add_argument("--no-sandbox")    # Bypass OS security model for Colab
+            options.add_argument("--disable-dev-shm-usage")  # Overcome limited shared memory
+            options.add_argument("--disable-gpu")   # Disable GPU in headless
             options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-            driver = webdriver.Chrome(options=options)
+            # Use webdriver-manager to install Chromedriver dynamically
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+            driver.set_page_load_timeout(20)  # Set timeout for slow pages
             driver.get(url)
             wait = WebDriverWait(driver, 10)
 
@@ -244,7 +254,6 @@ class SmartJobRecommenderRAG:
 
             # Site-specific scraping
             if 'indeed' in host:
-                # Indeed selectors
                 try:
                     details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="inlineHeader-companyName"]'))).text.strip()
                 except:
@@ -263,7 +272,6 @@ class SmartJobRecommenderRAG:
                     pass
 
             elif 'linkedin' in host:
-                # LinkedIn selectors
                 try:
                     details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.topcard__org-name-link'))).text.strip()
                 except:
@@ -285,10 +293,8 @@ class SmartJobRecommenderRAG:
                         details["description"] = driver.find_element(By.CSS_SELECTOR, '.show-more-less-html__markup').text.strip()
                     except:
                         pass
-                # Salary often not present on LinkedIn
 
             elif 'glassdoor' in host:
-                # Glassdoor selectors
                 try:
                     details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.employerName'))).text.strip()
                 except:
@@ -307,7 +313,6 @@ class SmartJobRecommenderRAG:
                     pass
 
             elif 'monster' in host:
-                # Monster selectors
                 try:
                     details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.company'))).text.strip()
                 except:
@@ -326,7 +331,6 @@ class SmartJobRecommenderRAG:
                     pass
 
             elif 'naukri' in host:
-                # Naukri selectors
                 try:
                     details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.comp-name'))).text.strip()
                 except:
@@ -345,7 +349,6 @@ class SmartJobRecommenderRAG:
                     pass
 
             elif 'internshala' in host:
-                # Internshala selectors
                 try:
                     details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.company_name'))).text.strip()
                 except:
@@ -364,13 +367,11 @@ class SmartJobRecommenderRAG:
                     pass
 
             else:
-                # Generic fallback
                 try:
                     details["description"] = wait.until(EC.presence_of_element_located((By.TAG_NAME, "body"))).text.strip()[:2000]
                 except:
                     pass
 
-            # Extract skills if not found
             if not details["required_skills"] and details["description"]:
                 details["required_skills"] = self.extract_skills_from_description(details["description"])
 
@@ -860,7 +861,7 @@ def main():
         if SELENIUM_AVAILABLE:
             st.success("✅ Selenium: Available for scraping")
         else:
-            st.error("❌ Selenium: Not available. Install selenium and Chrome/Chromedriver.")
+            st.error("❌ Selenium: Not available. Install selenium and webdriver-manager.")
 
         st.markdown("---")
         st.subheader("📋 Instructions")
@@ -868,7 +869,7 @@ def main():
         **Setup Required:**
         1. Add GEMINI_API_KEY to Streamlit secrets
         2. Add GOOGLE_API_KEY and SEARCH_ENGINE_ID to Streamlit secrets
-        3. Install Selenium and Chrome/Chromedriver for scraping
+        3. Run in Colab with the setup block enabled
 
         **How to Use:**
         1. Upload your resume PDF, OR
