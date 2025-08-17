@@ -5,14 +5,16 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.8):
-- Enhanced regex for extracting company, salary, and location from snippets to handle formats like "Company · Location".
-- Added automation on "Apply Now" click: Send job and user data to n8n webhook for cover letter generation and spreadsheet storage.
-- Fixed typos in code (e.g., list comprehension in call_direct_gemini).
-- Retained light theme and styling.
+Main changes (v2.6):
+- Added background image via CSS.
+- Expanded search queries for diversity.
+- Relaxed duplicate removal using apply_link.
+- Added debug output for API responses and queries.
+- Increased result limit to 10 per query.
+- Enhanced error handling for empty results.
 
 Author: AI Assistant (updated)
-Version: 2.8 (Improved Extraction and Automation)
+Version: 2.6 (Custom Search API with Background Image)
 """
 
 import streamlit as st
@@ -22,7 +24,6 @@ import os
 from typing import List, Dict, Any
 import tempfile
 from urllib.parse import quote_plus
-import re  # For parsing salary, location, and company
 
 # Import AI libraries with error handling
 try:
@@ -120,6 +121,8 @@ class SmartJobRecommenderRAG:
             st.error(f"❌ Error loading PDF: {e}")
             return []
 
+   
+
     def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
         """Call Gemini directly for text analysis"""
         if not self.gemini_client:
@@ -140,7 +143,7 @@ class SmartJobRecommenderRAG:
                     skills = [s.strip() for s in skills_text.split(',') if s.strip()]
                 elif line.startswith('JOB_INTERESTS:'):
                     interests_text = line.replace('JOB_INTERESTS:', '').strip()
-                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]
+                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]  # Fixed 's' to 'i'
                 elif line.startswith('EXPERIENCE_LEVEL:'):
                     experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
 
@@ -194,24 +197,6 @@ class SmartJobRecommenderRAG:
                             return s
 
         return ""
-
-    def extract_salary_from_snippet(self, snippet: str) -> str:
-        """Extract salary from snippet using regex"""
-        salary_pattern = r'(\$|USD|EUR)?\s*(\d{1,3}(?:,\d{3})?)(?:\s*-\s*\$?\d{1,3}(?:,\d{3})?)?(?:k|K| per year| annually| /yr)?'
-        match = re.search(salary_pattern, snippet)
-        return match.group(0) if match else "Not specified"
-
-    def extract_location_from_snippet(self, snippet: str) -> str:
-        """Extract location from snippet"""
-        location_pattern = r'· ([\w\s,]+) \('
-        match = re.search(location_pattern, snippet)
-        return match.group(1) if match else "Unknown Location"
-
-    def extract_company_from_snippet(self, snippet: str) -> str:
-        """Extract company name from snippet if not available in metadata"""
-        company_pattern = r'(\w+) ·'
-        match = re.search(company_pattern, snippet)
-        return match.group(1) if match else "Unknown Company"
 
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
         """Search jobs using Google Custom Search JSON API"""
@@ -283,21 +268,16 @@ class SmartJobRecommenderRAG:
                         continue
 
                     for item in data[items_key]:
-                        snippet = item.get("snippet", "")
-                        company = item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "")
-                        if company == "Unknown Company":
-                            company = self.extract_company_from_snippet(snippet)
-
                         job_data = {
                             "title": item.get("title", "Unknown Title") or "Unknown Title",
-                            "company": company or "Unknown Company",
-                            "location": self.extract_location_from_snippet(snippet),
-                            "description": snippet or "No description",
+                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                            "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
+                            "description": item.get("snippet", "No description") or "No description",
                             "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": self.extract_salary_from_snippet(snippet),
+                            "salary": "Not specified",
                             "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, snippet),
-                            "required_skills": self.extract_skills_from_description(snippet)
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
                         }
 
                         title_lower = (job_data["title"] or "").lower()
@@ -321,8 +301,8 @@ class SmartJobRecommenderRAG:
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
 
             return {
-                "jobs": unique_jobs[:20],
-                "internships": unique_internships[:10],
+                "jobs": unique_jobs[:20],  # Increased limit
+                "internships": unique_internships[:10],  # Increased limit
                 "search_queries": search_queries[:8]
             }
 
@@ -402,21 +382,16 @@ class SmartJobRecommenderRAG:
                         continue
 
                     for item in data[items_key]:
-                        snippet = item.get("snippet", "")
-                        company = item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "")
-                        if company == "Unknown Company":
-                            company = self.extract_company_from_snippet(snippet)
-
                         job_data = {
                             "title": item.get("title", "Unknown Title") or "Unknown Title",
-                            "company": company or "Unknown Company",
-                            "location": self.extract_location_from_snippet(snippet),
-                            "description": snippet or "No description",
+                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                            "location": location,
+                            "description": item.get("snippet", "No description") or "No description",
                             "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": self.extract_salary_from_snippet(snippet),
+                            "salary": "Not specified",
                             "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, snippet),
-                            "required_skills": self.extract_skills_from_description(snippet)
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
                         }
 
                         title_lower = (job_data["title"] or "").lower()
@@ -513,6 +488,42 @@ class SmartJobRecommenderRAG:
 # STREAMLIT UI COMPONENTS
 # ============================================================================
 
+# def main():
+#     """Main application function"""
+#     # Add background image CSS
+#     background_css = """
+#     <style>
+#     .stApp {
+    
+#         background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");  /* Replace with your image URL */
+#         background-size: cover;
+#         background-position: center;
+#         background-attachment: fixed;
+#         background-repeat: no-repeat;
+#     }
+#     /* Improve text readability */
+#     .stApp * {
+#         color: #000000;  /* black text for contrast */
+#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Text shadow for readability */
+#     }
+#     /* Ensure sidebar text is readable */
+#     .stSidebar * {
+#         color: #000000;
+#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
+#     }
+#     /* Optional: Style buttons for better visibility */
+#     .stButton>button {
+#         background-color: #FFFFFF;
+#         color: white;
+#         border-radius: 5px;
+#         border: none;
+#     }
+#     .stButton>button:hover {
+#         background-color: #FFFFFF;
+#     }
+#     </style>
+#     """
+#     st.markdown(background_css, unsafe_allow_html=True)
 def main():
     """Main application function"""
     # Add background image CSS for light theme
@@ -521,42 +532,44 @@ def main():
     /* Set background for entire app including top and browser file areas */
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-color: #FFFFFF; /* White background */
-        background-image: none; /* Remove any previous background image */
-        color: #333333; /* Light black text for contrast */
+        background-image: url("https://images.unsplash.com/photo-1519120944692-1a8d8cfc107f?q=80&w=1936&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+        color: #000000; /* Light black text for contrast */
+        background-position: center;
+        color: #000;  /* Ensures text remains readable */
     }
 
     /* Ensure sidebar matches light theme */
     .stSidebar {
         background-color: #FFFFFF; /* White sidebar */
-        color: #333333; /* Light black text */
+        color: #000000; /* Light black text */
     }
     .stSidebar * {
-        color: #333333;
+        color: #000000;
     }
 
     /* Improve text readability */
     .stApp *, body *, .css-1aumxhk *, .st-emotion-cache-1aumxhk * {
-        color: #333333; /* Consistent light black text */
+        color: #000000; /* Consistent light black text */
         text-shadow: none;
     }
 
     /* Style buttons with light grey background and light black text */
     .stButton>button {
         background-color: #D3D3D3; /* Light grey background */
-        color: #333333; /* Light black text */
+        color: #000000; /* Light black text */
         border: 1px solid #CCCCCC;
         border-radius: 5px;
         padding: 8px 16px;
     }
     .stButton>button:hover {
         background-color: #C0C0C0; /* Slightly darker grey on hover */
-        color: #333333;
+        color: #000000;
     }
 
     /* Success banner */
     [data-testid="stNotification"], .stAlert {
         background-color: #DFF5E1;
-        color: #333333;
+        color: #000000;
         border-radius: 8px;
         padding: 8px 12px;
         font-weight: 500;
@@ -599,7 +612,7 @@ def main():
         border-top: 1px solid #E0E0E0;
     }
 
-    /* Style selectbox (dropdown) for experience level to have white text */
+    /* Style selectbox (dropdown) to have white text */
     .stSelectbox div[role="listbox"] * {
         color: #FFFFFF !important;
     }
@@ -609,7 +622,58 @@ def main():
     }
     </style>
     """
+
+    # Search input box styling
+    st.markdown("""
+    <style>
+    /* Text Input & Text Area */
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea {
+        background-color: #d3d3d3 !important;
+        color: black !important;
+    }
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder {
+        color: #000000 !important;
+    }
+
+    /* Select Dropdown (Experience Level) */
+    [data-testid="stSelectbox"] div[data-baseweb="select"] {
+        background-color: #d3d3d3 !important;
+        color: black !important;
+    }
+    [data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: black !important;
+    }
+
+    /* Browse files button */
+    [data-testid="stFileUploaderBrowseButton"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 5px !important;
+        padding: 4px 12px !important;
+    }
+    [data-testid="stFileUploaderBrowseButton"]:hover {
+        background-color: #F0F0F0 !important;
+        color: #000000 !important;
+    }
+
+    /* File uploader text inside drop area */
+    [data-testid="stFileUploader"] section div {
+        color: #000000 !important; /* black text */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.markdown(background_css, unsafe_allow_html=True)
+
+
+
+
+
+
+    
 
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
@@ -899,22 +963,8 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
 
                     apply_link_local = (job.get('apply_link') or '').strip()
                     if apply_link_local and apply_link_local != "#":
-                        if st.button("🚀 Apply Now", key=f"apply_{i}"):
-                            apply_data = {
-                                "company": job['company'],
-                                "job_title": job['title'],
-                                "location": job['location'],
-                                "job_description": job['description'],
-                                "user_skills": ','.join(extracted_data['skills']),
-                                "experience_level": extracted_data['experience_level']
-                            }
-                            n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your n8n webhook URL
-                            response = requests.post(n8n_webhook_url, json=apply_data)
-                            if response.status_code == 200:
-                                st.success("✅ Application logged and cover letter generated!")
-                            else:
-                                st.error(f"❌ Error: {response.text}")
-                        st.caption("Click to apply on the job site and log application")
+                        st.link_button("🚀 Apply Now", apply_link_local, type="primary")
+                        st.caption("Click to apply on the job site")
                     else:
                         st.warning("No direct apply link available")
                         if job.get('company') and job.get('title'):
@@ -946,22 +996,8 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
 
                     internship_apply = (internship.get('apply_link') or '').strip()
                     if internship_apply and internship_apply != "#":
-                        if st.button("🚀 Apply Now", key=f"intern_apply_{i}"):
-                            apply_data = {
-                                "company": internship['company'],
-                                "job_title": internship['title'],
-                                "location": internship['location'],
-                                "job_description": internship['description'],
-                                "user_skills": ','.join(extracted_data['skills']),
-                                "experience_level": extracted_data['experience_level']
-                            }
-                            n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your n8n webhook URL
-                            response = requests.post(n8n_webhook_url, json=apply_data)
-                            if response.status_code == 200:
-                                st.success("✅ Application logged and cover letter generated!")
-                            else:
-                                st.error(f"❌ Error: {response.text}")
-                        st.caption("Click to apply on the internship site and log application")
+                        st.link_button("🚀 Apply Now", internship_apply, type="primary")
+                        st.caption("Click to apply on the internship site")
                     else:
                         st.warning("No direct apply link available")
                         if internship.get('company') and internship.get('title'):
@@ -978,9 +1014,44 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
         - Quota limits reached (check Google Cloud Console)
         """)
 
+    ########
+    for i, job in enumerate(job_data):
+        with st.expander(f"{job['title']} at {job['company']}"):
+            st.write(f"**Location:** {job['location']}")
+            st.write(f"**Description:** {job['description']}")
+            st.write(f"**Match Score:** {job['match_score']:.2f}%")
+            st.write(f"**Link:** [{job['link']}]({job['link']})")
+            if st.button("🚀 Apply Now", key=f"apply_{i}"):
+                apply_data = {
+                    "company": job['company'],
+                    "job_title": job['title'],
+                    "location": job['location'],
+                    "job_description": job['description'],
+                    "user_skills": ','.join(extracted_data['skills']),
+                    "experience_level": extracted_data['experience_level']
+                }
+                import requests
+                n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your URL
+                response = requests.post(n8n_webhook_url, json=apply_data)
+                if response.status_code == 200:
+                    st.success("✅ Application logged and cover letter generated!")
+                else:
+                    st.error(f"❌ Error: {response.text}")
+
+
+
 # ============================================================================
 # RUN APPLICATION
 # ============================================================================
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
