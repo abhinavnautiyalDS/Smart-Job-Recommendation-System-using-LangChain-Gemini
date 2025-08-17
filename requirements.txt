@@ -4,3 +4,4 @@ requests>=2.32.0
 google-generativeai==0.8.0
 pypdf==5.9.0
 selenium>=4.0.0
+chromedriver 
