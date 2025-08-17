@@ -5,14 +5,13 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.7):
-- Improved extraction of company, salary, and location from snippets using regex.
-- Added automation on "Apply Now" click: Send job and user data to n8n webhook for cover letter generation and spreadsheet storage.
-- Fixed typos in code (e.g., list comprehension in call_direct_gemini).
-- Retained light theme and styling.
+Main changes (v2.8):
+- Updated CSS to match the screenshot styling: white background with subtle diagonal stripes, black text, red Apply Now button with white text.
+- Kept all previous improvements (automation, extraction, etc.).
+- Added subtle diagonal lines background using CSS linear-gradient.
 
 Author: AI Assistant (updated)
-Version: 2.7 (With Automation Integration)
+Version: 2.8 (Styled to Match Screenshot)
 """
 
 import streamlit as st
@@ -984,3 +983,4 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
 
 if __name__ == "__main__":
     main()
+```
