@@ -3,16 +3,16 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 =============================================
 
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
-Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0, selenium==4.10.0.
+Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.9):
-- Added Selenium for accurate web scraping of job details (company, position, location, salary).
+Main changes (v2.8):
 - Enhanced regex for extracting company, salary, and location from snippets to handle formats like "Company · Location".
 - Added automation on "Apply Now" click: Send job and user data to n8n webhook for cover letter generation and spreadsheet storage.
+- Fixed typos in code (e.g., list comprehension in call_direct_gemini).
 - Retained light theme and styling.
 
 Author: AI Assistant (updated)
-Version: 2.9 (Added Selenium for Web Scraping)
+Version: 2.8 (Improved Extraction and Automation)
 """
 
 import streamlit as st
@@ -39,19 +39,6 @@ except ImportError:
     PYPDF_AVAILABLE = False
     st.error("PyPDF not available. Please install: pip install pypdf==5.9.0")
 
-# Import Selenium for web scraping
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    SELENIUM_AVAILABLE = True
-except ImportError:
-    SELENIUM_AVAILABLE = False
-    st.error("Selenium not available. Please install: pip install selenium==4.10.0 and ensure ChromeDriver is installed")
-
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -68,12 +55,11 @@ st.set_page_config(
 # ============================================================================
 
 class SmartJobRecommenderRAG:
-    """Enhanced RAG system for job recommendations using Gemini Flash and Selenium"""
+    """Enhanced RAG system for job recommendations using Gemini Flash"""
 
     def __init__(self):
         self.gemini_client = None
         self.initialize_gemini()
-        self.driver = None
 
     def initialize_gemini(self) -> bool:
         """Initialize Gemini AI client"""
@@ -98,30 +84,6 @@ class SmartJobRecommenderRAG:
         except Exception as e:
             st.error(f"❌ Error initializing Gemini: {e}")
             return False
-
-    def initialize_selenium(self):
-        """Initialize Selenium WebDriver"""
-        if not SELENIUM_AVAILABLE:
-            st.error("Selenium not available for web scraping")
-            return False
-
-        try:
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")  # Run in headless mode
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            service = Service(executable_path="/usr/bin/chromedriver")  # Adjust path as needed
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            st.success("✅ Selenium WebDriver initialized successfully")
-            return True
-        except Exception as e:
-            st.error(f"❌ Error initializing Selenium: {e}")
-            return False
-
-    def cleanup_selenium(self):
-        """Cleanup Selenium WebDriver"""
-        if self.driver:
-            self.driver.quit()
 
     def load_document_with_pypdf(self, uploaded_file) -> List:
         """Load PDF document using PyPDF (defensive against None pages)"""
@@ -251,55 +213,8 @@ class SmartJobRecommenderRAG:
         match = re.search(company_pattern, snippet)
         return match.group(1) if match else "Unknown Company"
 
-    def scrape_job_details(self, apply_link: str) -> Dict[str, Any]:
-        """Scrape job details using Selenium"""
-        if not self.driver or not apply_link:
-            return {"company": "Unknown Company", "title": "Unknown Title", "location": "Unknown Location", "salary": "Not specified"}
-
-        try:
-            self.driver.get(apply_link)
-            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-
-            # Extract company name (example: look for common class names or tags)
-            try:
-                company = self.driver.find_element(By.CLASS_NAME, "company").text
-            except:
-                company = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Company')]").text.split(':')[1].strip() if self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Company')]") else "Unknown Company"
-
-            # Extract job title
-            try:
-                title = self.driver.find_element(By.TAG_NAME, "h1").text
-            except:
-                title = "Unknown Title"
-
-            # Extract location
-            try:
-                location = self.driver.find_element(By.CLASS_NAME, "location").text
-            except:
-                location = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Location')]").text.split(':')[1].strip() if self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Location')]") else "Unknown Location"
-
-            # Extract salary
-            try:
-                salary = self.driver.find_element(By.CLASS_NAME, "salary").text
-            except:
-                salary = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Salary')]").text.split(':')[1].strip() if self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Salary')]") else "Not specified"
-
-            return {
-                "company": company,
-                "title": title,
-                "location": location,
-                "salary": salary
-            }
-
-        except Exception as e:
-            st.warning(f"⚠️ Error scraping {apply_link}: {str(e)}")
-            return {"company": "Unknown Company", "title": "Unknown Title", "location": "Unknown Location", "salary": "Not specified"}
-
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
-        """Search jobs using Google Custom Search JSON API and enhance with Selenium"""
-        if not self.initialize_selenium():
-            return {"jobs": [], "internships": [], "search_queries": []}
-
+        """Search jobs using Google Custom Search JSON API"""
         try:
             try:
                 google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -310,7 +225,6 @@ class SmartJobRecommenderRAG:
 
             if not google_api_key or not search_engine_id:
                 st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
-                self.cleanup_selenium()
                 return {"jobs": [], "internships": [], "search_queries": []}
 
             search_queries = []
@@ -370,16 +284,17 @@ class SmartJobRecommenderRAG:
 
                     for item in data[items_key]:
                         snippet = item.get("snippet", "")
-                        apply_link = self.get_best_apply_link(item, response_data=data)
-                        scraped_data = self.scrape_job_details(apply_link) if apply_link else {}
+                        company = item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "")
+                        if company == "Unknown Company":
+                            company = self.extract_company_from_snippet(snippet)
 
                         job_data = {
-                            "title": scraped_data.get("title", item.get("title", "Unknown Title")) or "Unknown Title",
-                            "company": scraped_data.get("company", item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "")) or self.extract_company_from_snippet(snippet) or "Unknown Company",
-                            "location": scraped_data.get("location", self.extract_location_from_snippet(snippet)) or "Unknown Location",
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": company or "Unknown Company",
+                            "location": self.extract_location_from_snippet(snippet),
                             "description": snippet or "No description",
-                            "apply_link": apply_link,
-                            "salary": scraped_data.get("salary", self.extract_salary_from_snippet(snippet)) or "Not specified",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": self.extract_salary_from_snippet(snippet),
                             "source": "Google Custom Search",
                             "match_score": self.calculate_match_score(skills, snippet),
                             "required_skills": self.extract_skills_from_description(snippet)
@@ -404,7 +319,7 @@ class SmartJobRecommenderRAG:
             unique_internships.sort(key=lambda x: x.get("match_score", 0), reverse=True)
 
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
-            self.cleanup_selenium()
+
             return {
                 "jobs": unique_jobs[:20],
                 "internships": unique_internships[:10],
@@ -413,14 +328,10 @@ class SmartJobRecommenderRAG:
 
         except Exception as e:
             st.error(f"❌ Error with job search: {e}")
-            self.cleanup_selenium()
             return {"jobs": [], "internships": [], "search_queries": []}
 
     def search_jobs_with_custom_search_api_location(self, skills: List[str], job_interests: List[str], location: str) -> Dict[str, List]:
-        """Search jobs with location preference using Google Custom Search JSON API and enhance with Selenium"""
-        if not self.initialize_selenium():
-            return {"jobs": [], "internships": [], "search_queries": []}
-
+        """Search jobs with location preference using Google Custom Search JSON API"""
         try:
             try:
                 google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -431,7 +342,6 @@ class SmartJobRecommenderRAG:
 
             if not google_api_key or not search_engine_id:
                 st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
-                self.cleanup_selenium()
                 return {"jobs": [], "internships": [], "search_queries": []}
 
             search_queries = []
@@ -493,16 +403,17 @@ class SmartJobRecommenderRAG:
 
                     for item in data[items_key]:
                         snippet = item.get("snippet", "")
-                        apply_link = self.get_best_apply_link(item, response_data=data)
-                        scraped_data = self.scrape_job_details(apply_link) if apply_link else {}
+                        company = item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "")
+                        if company == "Unknown Company":
+                            company = self.extract_company_from_snippet(snippet)
 
                         job_data = {
-                            "title": scraped_data.get("title", item.get("title", "Unknown Title")) or "Unknown Title",
-                            "company": scraped_data.get("company", item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "")) or self.extract_company_from_snippet(snippet) or "Unknown Company",
-                            "location": scraped_data.get("location", self.extract_location_from_snippet(snippet)) or "Unknown Location",
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": company or "Unknown Company",
+                            "location": self.extract_location_from_snippet(snippet),
                             "description": snippet or "No description",
-                            "apply_link": apply_link,
-                            "salary": scraped_data.get("salary", self.extract_salary_from_snippet(snippet)) or "Not specified",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": self.extract_salary_from_snippet(snippet),
                             "source": "Google Custom Search",
                             "match_score": self.calculate_match_score(skills, snippet),
                             "required_skills": self.extract_skills_from_description(snippet)
@@ -527,7 +438,7 @@ class SmartJobRecommenderRAG:
             unique_internships.sort(key=lambda x: x.get("match_score", 0), reverse=True)
 
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships in {location}")
-            self.cleanup_selenium()
+
             return {
                 "jobs": unique_jobs[:20],
                 "internships": unique_internships[:10],
@@ -536,7 +447,6 @@ class SmartJobRecommenderRAG:
 
         except Exception as e:
             st.error(f"❌ Error with location-based job search: {e}")
-            self.cleanup_selenium()
             return {"jobs": [], "internships": [], "search_queries": []}
 
     def calculate_match_score(self, user_skills: List[str], job_description: str) -> int:
@@ -737,7 +647,6 @@ def main():
         **Setup Required:**
         1. Add GEMINI_API_KEY to Streamlit secrets
         2. Add GOOGLE_API_KEY and SEARCH_ENGINE_ID to Streamlit secrets
-        3. Install ChromeDriver and ensure it's in PATH
 
         **How to Use:**
         1. Upload your resume PDF, OR
@@ -752,4 +661,326 @@ def main():
         - Resume PDF analysis
         - Manual skill entry
         - Real-time job search via Google Custom Search
-        - Real-time matching
+        - Real-time matching scores
+        - Clickable application links
+        - Location-based search
+        """)
+
+    tab1, tab2 = st.tabs(["📄 Resume Upload", "✍️ Manual Entry"])
+
+    with tab1:
+        st.header("📄 Upload Your Resume")
+        st.markdown("Upload your resume in PDF format for AI-powered skill extraction and job matching.")
+
+        uploaded_file = st.file_uploader(
+            "Choose your resume PDF file",
+            type="pdf",
+            help="Upload a clear, text-readable PDF resume for best results."
+        )
+
+        if uploaded_file is not None:
+            st.success(f"✅ Uploaded: {uploaded_file.name}")
+
+            if st.button("🚀 Analyze Resume & Find Jobs", type="primary"):
+                process_resume_and_find_jobs(uploaded_file)
+
+    with tab2:
+        st.header("✍️ Manual Skills Entry")
+        st.markdown("Enter your skills and preferences manually to find matching job opportunities.")
+
+        with st.form("manual_skills_form"):
+            skills_input = st.text_area(
+                "Your Skills (comma-separated)",
+                placeholder="e.g., Python, React, Machine Learning, SQL, Project Management",
+                height=100,
+                help="Enter your technical and soft skills separated by commas"
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                job_interests = st.text_input(
+                    "Job Interests (comma-separated)",
+                    placeholder="e.g., Software Developer, Data Scientist, Product Manager",
+                    help="Enter job titles or fields you're interested in"
+                )
+
+                experience_level = st.selectbox(
+                    "Experience Level",
+                    ["entry", "mid", "senior"],
+                    help="Select your current experience level"
+                )
+
+            with col2:
+                location_pref = st.text_input(
+                    "Preferred Location (Optional)",
+                    placeholder="e.g., United States, Remote, New York",
+                    help="Enter your preferred job location"
+                )
+
+            submitted = st.form_submit_button("🔍 Find Matching Jobs", type="primary")
+
+            if submitted:
+                if skills_input.strip():
+                    skills_list = [skill.strip() for skill in skills_input.split(',') if skill.strip()]
+                    interests_list = [interest.strip() for interest in job_interests.split(',') if interest.strip()]
+
+                    manual_data = {
+                        "skills": skills_list,
+                        "job_interests": interests_list,
+                        "experience_level": experience_level
+                    }
+
+                    process_manual_skills_and_find_jobs(manual_data, location_pref)
+                else:
+                    st.error("Please enter at least some skills to find matching jobs.")
+
+def process_resume_and_find_jobs(uploaded_file):
+    """Process uploaded resume and find matching jobs"""
+    rag_system = st.session_state.rag_system
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    try:
+        status_text.text("📄 Loading PDF document...")
+        progress_bar.progress(20)
+        documents = rag_system.load_document_with_pypdf(uploaded_file)
+
+        if not documents:
+            st.error("❌ Failed to load PDF. Please check the file format.")
+            return
+
+        status_text.text("📝 Analyzing resume content...")
+        progress_bar.progress(50)
+
+        all_text = "\n\n".join([doc.page_content for doc in documents])
+
+        final_prompt = f"""
+Based on the following resume content, extract relevant information:
+
+RESUME CONTENT:
+{all_text}
+
+Extract:
+1. Technical skills (programming languages, frameworks, tools)
+2. Soft skills
+3. Job preferences or career interests
+4. Experience level
+
+Format your response as:
+SKILLS: [comma-separated list of skills]
+JOB_INTERESTS: [comma-separated job titles/fields]
+EXPERIENCE_LEVEL: [entry/mid/senior]
+"""
+
+        status_text.text("🤖 Analyzing with Gemini AI...")
+        progress_bar.progress(80)
+        extracted_data = rag_system.call_direct_gemini(final_prompt)
+        st.write(f"Extracted Data: {extracted_data}")  # Debug
+
+        status_text.text("🔍 Searching for matching jobs...")
+        progress_bar.progress(90)
+        job_results = rag_system.search_jobs_with_custom_search_api(
+            extracted_data["skills"],
+            extracted_data["job_interests"]
+        )
+
+        progress_bar.progress(100)
+        status_text.text("✅ Analysis complete!")
+        time.sleep(1)
+
+        progress_bar.empty()
+        status_text.empty()
+
+        display_results(extracted_data, job_results)
+
+    except Exception as e:
+        st.error(f"❌ Error during processing: {e}")
+        progress_bar.empty()
+        status_text.empty()
+
+def process_manual_skills_and_find_jobs(manual_data: Dict[str, Any], location_pref: str):
+    """Process manually entered skills and find matching jobs"""
+    rag_system = st.session_state.rag_system
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    try:
+        status_text.text("📝 Processing your skills...")
+        progress_bar.progress(20)
+
+        st.success(f"✅ Skills processed: {len(manual_data['skills'])} skills found")
+        st.write(f"Manual Input Data: {manual_data}")  # Debug
+
+        status_text.text("🔍 Searching for matching jobs...")
+        progress_bar.progress(60)
+
+        if location_pref.strip():
+            job_results = rag_system.search_jobs_with_custom_search_api_location(
+                manual_data["skills"],
+                manual_data["job_interests"],
+                location_pref
+            )
+        else:
+            job_results = rag_system.search_jobs_with_custom_search_api(
+                manual_data["skills"],
+                manual_data["job_interests"]
+            )
+
+        progress_bar.progress(100)
+        status_text.text("✅ Search complete!")
+        time.sleep(1)
+
+        progress_bar.empty()
+        status_text.empty()
+
+        display_results(manual_data, job_results)
+
+    except Exception as e:
+        st.error(f"❌ Error during job search: {e}")
+        progress_bar.empty()
+        status_text.empty()
+
+def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]):
+    """Display analysis results and job recommendations"""
+    st.markdown("---")
+    st.header("📊 Analysis Results")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.subheader("🛠️ Skills Found")
+        if extracted_data["skills"]:
+            for skill in extracted_data["skills"]:
+                st.markdown(f"• {skill}")
+        else:
+            st.info("No specific skills detected")
+
+    with col2:
+        st.subheader("💼 Job Interests")
+        if extracted_data["job_interests"]:
+            for interest in extracted_data["job_interests"]:
+                st.markdown(f"• {interest}")
+        else:
+            st.info("No specific interests detected")
+
+    with col3:
+        st.subheader("📈 Experience Level")
+        level = extracted_data["experience_level"].title()
+        st.markdown(f"**{level}**")
+
+    st.markdown("---")
+    st.header("💼 Job Recommendations")
+
+    jobs = job_results.get("jobs", []) if isinstance(job_results, dict) else []
+    internships = job_results.get("internships", []) if isinstance(job_results, dict) else []
+
+    if jobs:
+        st.subheader(f"🎯 Found {len(jobs)} Job Matches")
+
+        for i, job in enumerate(jobs, 1):
+            with st.expander(f"#{i} {job['title']} at {job['company']} - {job.get('match_score', 0)}% Match"):
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    st.write(f"**Company:** {job['company']}")
+                    st.write(f"**Location:** {job['location']}")
+                    st.write(f"**Salary:** {job.get('salary', 'Not specified')}")
+                    st.write(f"**Description:** {job.get('description','')[:200]}...")
+
+                    if job.get('required_skills'):
+                        st.write("**Required Skills:**")
+                        for skill in job.get('required_skills', []):
+                            st.markdown(f"• {skill}")
+
+                with col2:
+                    st.metric("Match Score", f"{job.get('match_score',0)}%")
+                    st.write(f"**Source:** {job.get('source', 'Unknown')}")
+
+                    apply_link_local = (job.get('apply_link') or '').strip()
+                    if apply_link_local and apply_link_local != "#":
+                        if st.button("🚀 Apply Now", key=f"apply_{i}"):
+                            apply_data = {
+                                "company": job['company'],
+                                "job_title": job['title'],
+                                "location": job['location'],
+                                "job_description": job['description'],
+                                "user_skills": ','.join(extracted_data['skills']),
+                                "experience_level": extracted_data['experience_level']
+                            }
+                            n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your n8n webhook URL
+                            response = requests.post(n8n_webhook_url, json=apply_data)
+                            if response.status_code == 200:
+                                st.success("✅ Application logged and cover letter generated!")
+                            else:
+                                st.error(f"❌ Error: {response.text}")
+                        st.caption("Click to apply on the job site and log application")
+                    else:
+                        st.warning("No direct apply link available")
+                        if job.get('company') and job.get('title'):
+                            q = quote_plus(f"{job.get('company')} {job.get('title')} jobs")
+                            search_url = f"https://www.google.com/search?q={q}"
+                            st.link_button("🔍 Search on Google", search_url)
+
+    if internships:
+        st.markdown("---")
+        st.subheader(f"🎓 Found {len(internships)} Internship Matches")
+
+        for i, internship in enumerate(internships, 1):
+            with st.expander(f"#{i} {internship['title']} at {internship['company']} - {internship.get('match_score',0)}% Match"):
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    st.write(f"**Company:** {internship['company']}")
+                    st.write(f"**Location:** {internship.get('location','')}")
+                    st.write(f"**Description:** {internship.get('description','')[:200]}...")
+
+                    if internship.get('required_skills'):
+                        st.write("**Required Skills:**")
+                        for skill in internship.get('required_skills', []):
+                            st.markdown(f"• {skill}")
+
+                with col2:
+                    st.metric("Match Score", f"{internship.get('match_score',0)}%")
+                    st.write(f"**Source:** {internship.get('source', 'Unknown')}")
+
+                    internship_apply = (internship.get('apply_link') or '').strip()
+                    if internship_apply and internship_apply != "#":
+                        if st.button("🚀 Apply Now", key=f"intern_apply_{i}"):
+                            apply_data = {
+                                "company": internship['company'],
+                                "job_title": internship['title'],
+                                "location": internship['location'],
+                                "job_description": internship['description'],
+                                "user_skills": ','.join(extracted_data['skills']),
+                                "experience_level": extracted_data['experience_level']
+                            }
+                            n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your n8n webhook URL
+                            response = requests.post(n8n_webhook_url, json=apply_data)
+                            if response.status_code == 200:
+                                st.success("✅ Application logged and cover letter generated!")
+                            else:
+                                st.error(f"❌ Error: {response.text}")
+                        st.caption("Click to apply on the internship site and log application")
+                    else:
+                        st.warning("No direct apply link available")
+                        if internship.get('company') and internship.get('title'):
+                            q = quote_plus(f"{internship.get('company')} {internship.get('title')} internship")
+                            search_url = f"https://www.google.com/search?q={q}"
+                            st.link_button("🔍 Search on Google", search_url)
+
+    if not jobs and not internships:
+        st.info("🔍 No job matches found. This could be due to:")
+        st.markdown("""
+        - API configuration issues (check GOOGLE_API_KEY and SEARCH_ENGINE_ID)
+        - Limited results from job sites (try broader queries or more skills)
+        - CSE not configured to search the entire web
+        - Quota limits reached (check Google Cloud Console)
+        """)
+
+# ============================================================================
+# RUN APPLICATION
+# ============================================================================
+
+if __name__ == "__main__":
+    main()
