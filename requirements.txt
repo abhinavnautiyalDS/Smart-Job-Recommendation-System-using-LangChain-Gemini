@@ -3,4 +3,4 @@ pandas>=2.3.0
 requests>=2.32.0
 google-generativeai==0.8.0
 pypdf==5.9.0
-selenium
+selenium>=4.0.0
