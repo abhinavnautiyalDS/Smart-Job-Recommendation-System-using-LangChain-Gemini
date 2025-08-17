@@ -326,7 +326,7 @@ def main():
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
-    st.title("💼 Smart Job Recommender")
+    st.title("💼 Smart Job Recommender abhinav anuyahva")
     st.markdown("### AI-Powered Job Matching with Real-Time Web Scraping")
     st.markdown("---")
 
@@ -386,7 +386,7 @@ def display_results(user_data, job_results):
     st.write("**Interests:** " + ", ".join(user_data.get("job_interests", [])))
     
     st.markdown("---")
-    st.header("💼 Job Recommendations abhinav anuyahva")
+    st.header("💼 Job Recommendations")
     
     jobs = job_results.get("jobs", [])
     internships = job_results.get("internships", [])
