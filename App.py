@@ -5,16 +5,15 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.6):
-- Added background image via CSS.
-- Expanded search queries for diversity.
-- Relaxed duplicate removal using apply_link.
-- Added debug output for API responses and queries.
-- Increased result limit to 10 per query.
-- Enhanced error handling for empty results.
+Main changes (v2.7):
+- Integrated Selenium for advanced web scraping to extract company, location, salary, and other details.
+- Added site-specific scraping selectors for Indeed, LinkedIn, Naukri, Internshala, etc.
+- Updated search queries to include additional job platforms (Naukri, Internshala).
+- Enhanced error handling for scraping.
+- Limited scraping to top results to improve performance.
 
 Author: AI Assistant (updated)
-Version: 2.6 (Custom Search API with Background Image)
+Version: 2.7 (With Selenium Web Scraping)
 """
 
 import streamlit as st
@@ -23,7 +22,7 @@ import time
 import os
 from typing import List, Dict, Any
 import tempfile
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 # Import AI libraries with error handling
 try:
@@ -39,6 +38,19 @@ try:
 except ImportError:
     PYPDF_AVAILABLE = False
     st.error("PyPDF not available. Please install: pip install pypdf==5.9.0")
+
+# Import Selenium for web scraping
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import NoSuchElementException, TimeoutException
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
+    st.error("Selenium not available. Please install: pip install selenium. Also, ensure Chrome and Chromedriver are installed.")
 
 # ============================================================================
 # CONFIGURATION
@@ -101,7 +113,7 @@ class SmartJobRecommenderRAG:
             reader = PdfReader(temp_file_path)
 
             for page_num, page in enumerate(reader.pages):
-                text = page.extract_text_lines() if hasattr(page, 'extract_text_lines') else page.extract_text() if hasattr(page, 'extract_text') else None
+                text = page.extract_text() if hasattr(page, 'extract_text') else None
                 if text and text.strip():
                     doc_obj = type('Document', (), {
                         'page_content': text,
@@ -120,8 +132,6 @@ class SmartJobRecommenderRAG:
         except Exception as e:
             st.error(f"❌ Error loading PDF: {e}")
             return []
-
-   
 
     def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
         """Call Gemini directly for text analysis"""
@@ -143,7 +153,7 @@ class SmartJobRecommenderRAG:
                     skills = [s.strip() for s in skills_text.split(',') if s.strip()]
                 elif line.startswith('JOB_INTERESTS:'):
                     interests_text = line.replace('JOB_INTERESTS:', '').strip()
-                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]  # Fixed 's' to 'i'
+                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]
                 elif line.startswith('EXPERIENCE_LEVEL:'):
                     experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
 
@@ -198,8 +208,181 @@ class SmartJobRecommenderRAG:
 
         return ""
 
+    def scrape_job_page(self, url: str) -> Dict[str, Any]:
+        """Scrape job details from the job page using Selenium with site-specific selectors"""
+        if not SELENIUM_AVAILABLE:
+            st.error("Selenium not available for scraping.")
+            return {
+                "company": "Unknown Company",
+                "location": "Unknown Location",
+                "salary": "Not specified",
+                "description": "No description",
+                "required_skills": []
+            }
+
+        details = {
+            "company": "Unknown Company",
+            "location": "Unknown Location",
+            "salary": "Not specified",
+            "description": "No description",
+            "required_skills": []
+        }
+
+        try:
+            options = Options()
+            options.add_argument("--headless=new")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+            driver = webdriver.Chrome(options=options)
+            driver.get(url)
+            wait = WebDriverWait(driver, 10)
+
+            host = urlparse(url).netloc.lower()
+
+            # Site-specific scraping
+            if 'indeed' in host:
+                # Indeed selectors
+                try:
+                    details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="inlineHeader-companyName"]'))).text.strip()
+                except:
+                    pass
+                try:
+                    details["location"] = driver.find_element(By.CSS_SELECTOR, '[data-testid="inlineHeader-companyLocation"]').text.strip()
+                except:
+                    pass
+                try:
+                    details["salary"] = driver.find_element(By.CSS_SELECTOR, '[data-testid="attribute_snippet_testid"]').text.strip()
+                except:
+                    pass
+                try:
+                    details["description"] = driver.find_element(By.ID, "jobDescriptionText").text.strip()
+                except:
+                    pass
+
+            elif 'linkedin' in host:
+                # LinkedIn selectors
+                try:
+                    details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.topcard__org-name-link'))).text.strip()
+                except:
+                    try:
+                        details["company"] = driver.find_element(By.CSS_SELECTOR, '.top-card-layout__entity-info h3 a').text.strip()
+                    except:
+                        pass
+                try:
+                    details["location"] = driver.find_element(By.CSS_SELECTOR, '.topcard__flavor--black-link').text.strip()
+                except:
+                    try:
+                        details["location"] = driver.find_element(By.CSS_SELECTOR, '.top-card-layout__entity-info h4').text.strip()
+                    except:
+                        pass
+                try:
+                    details["description"] = driver.find_element(By.CSS_SELECTOR, '.description__text').text.strip()
+                except:
+                    try:
+                        details["description"] = driver.find_element(By.CSS_SELECTOR, '.show-more-less-html__markup').text.strip()
+                    except:
+                        pass
+                # Salary often not present on LinkedIn
+
+            elif 'glassdoor' in host:
+                # Glassdoor selectors
+                try:
+                    details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.employerName'))).text.strip()
+                except:
+                    pass
+                try:
+                    details["location"] = driver.find_element(By.CSS_SELECTOR, '.location').text.strip()
+                except:
+                    pass
+                try:
+                    details["salary"] = driver.find_element(By.CSS_SELECTOR, '.salaryText').text.strip()
+                except:
+                    pass
+                try:
+                    details["description"] = driver.find_element(By.ID, "JobDescriptionContainer").text.strip()
+                except:
+                    pass
+
+            elif 'monster' in host:
+                # Monster selectors
+                try:
+                    details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.company'))).text.strip()
+                except:
+                    pass
+                try:
+                    details["location"] = driver.find_element(By.CSS_SELECTOR, '.location').text.strip()
+                except:
+                    pass
+                try:
+                    details["salary"] = driver.find_element(By.CSS_SELECTOR, '.salary').text.strip()
+                except:
+                    pass
+                try:
+                    details["description"] = driver.find_element(By.ID, "JobDescription").text.strip()
+                except:
+                    pass
+
+            elif 'naukri' in host:
+                # Naukri selectors
+                try:
+                    details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.comp-name'))).text.strip()
+                except:
+                    pass
+                try:
+                    details["location"] = driver.find_element(By.CSS_SELECTOR, '.locWdth').text.strip()
+                except:
+                    pass
+                try:
+                    details["salary"] = driver.find_element(By.CSS_SELECTOR, '.salFig').text.strip()
+                except:
+                    pass
+                try:
+                    details["description"] = driver.find_element(By.CSS_SELECTOR, '.job-desc').text.strip()
+                except:
+                    pass
+
+            elif 'internshala' in host:
+                # Internshala selectors
+                try:
+                    details["company"] = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.company_name'))).text.strip()
+                except:
+                    pass
+                try:
+                    details["location"] = driver.find_element(By.CSS_SELECTOR, '.location_link').text.strip()
+                except:
+                    pass
+                try:
+                    details["salary"] = driver.find_element(By.CSS_SELECTOR, '.stipend').text.strip()
+                except:
+                    pass
+                try:
+                    details["description"] = driver.find_element(By.CSS_SELECTOR, '.job_description').text.strip()
+                except:
+                    pass
+
+            else:
+                # Generic fallback
+                try:
+                    details["description"] = wait.until(EC.presence_of_element_located((By.TAG_NAME, "body"))).text.strip()[:2000]
+                except:
+                    pass
+
+            # Extract skills if not found
+            if not details["required_skills"] and details["description"]:
+                details["required_skills"] = self.extract_skills_from_description(details["description"])
+
+            driver.quit()
+
+        except Exception as e:
+            st.warning(f"⚠️ Error scraping {url}: {str(e)}")
+
+        return details
+
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
-        """Search jobs using Google Custom Search JSON API"""
+        """Search jobs using Google Custom Search JSON API and scrape details with Selenium"""
         try:
             try:
                 google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -241,12 +424,12 @@ class SmartJobRecommenderRAG:
 
             url = "https://www.googleapis.com/customsearch/v1"
 
-            for query in search_queries[:5]:  # Increased to 5 queries
+            for query in search_queries[:5]:  # Limit to 5 queries
                 try:
                     params = {
                         "key": google_api_key,
                         "cx": search_engine_id,
-                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com | site:naukri.com | site:internshala.com",
                         "num": 10,  # Max results per query
                         "safe": "off"  # Disable SafeSearch for broader results
                     }
@@ -268,16 +451,22 @@ class SmartJobRecommenderRAG:
                         continue
 
                     for item in data[items_key]:
+                        job_url = item.get("link")
+                        if not job_url:
+                            continue
+
+                        scraped = self.scrape_job_page(job_url)
+
                         job_data = {
                             "title": item.get("title", "Unknown Title") or "Unknown Title",
-                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
-                            "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
-                            "description": item.get("snippet", "No description") or "No description",
-                            "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": "Not specified",
+                            "company": scraped["company"],
+                            "location": scraped["location"],
+                            "description": scraped["description"] or item.get("snippet", "No description"),
+                            "apply_link": job_url,
+                            "salary": scraped["salary"],
                             "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
-                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                            "match_score": self.calculate_match_score(skills, scraped["description"] or item.get("snippet", "")),
+                            "required_skills": scraped["required_skills"]
                         }
 
                         title_lower = (job_data["title"] or "").lower()
@@ -286,7 +475,7 @@ class SmartJobRecommenderRAG:
                         else:
                             all_jobs.append(job_data)
 
-                    time.sleep(0.5)
+                    time.sleep(1)  # Increased sleep to avoid rate limits
 
                 except Exception as e:
                     st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
@@ -301,8 +490,8 @@ class SmartJobRecommenderRAG:
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
 
             return {
-                "jobs": unique_jobs[:20],  # Increased limit
-                "internships": unique_internships[:10],  # Increased limit
+                "jobs": unique_jobs[:20],
+                "internships": unique_internships[:10],
                 "search_queries": search_queries[:8]
             }
 
@@ -311,7 +500,7 @@ class SmartJobRecommenderRAG:
             return {"jobs": [], "internships": [], "search_queries": []}
 
     def search_jobs_with_custom_search_api_location(self, skills: List[str], job_interests: List[str], location: str) -> Dict[str, List]:
-        """Search jobs with location preference using Google Custom Search JSON API"""
+        """Search jobs with location preference using Google Custom Search JSON API and scrape details"""
         try:
             try:
                 google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -360,7 +549,7 @@ class SmartJobRecommenderRAG:
                     params = {
                         "key": google_api_key,
                         "cx": search_engine_id,
-                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com | site:naukri.com | site:internshala.com",
                         "num": 10,
                         "safe": "off"
                     }
@@ -382,16 +571,22 @@ class SmartJobRecommenderRAG:
                         continue
 
                     for item in data[items_key]:
+                        job_url = item.get("link")
+                        if not job_url:
+                            continue
+
+                        scraped = self.scrape_job_page(job_url)
+
                         job_data = {
                             "title": item.get("title", "Unknown Title") or "Unknown Title",
-                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
-                            "location": location,
-                            "description": item.get("snippet", "No description") or "No description",
-                            "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": "Not specified",
+                            "company": scraped["company"],
+                            "location": scraped["location"] or location,
+                            "description": scraped["description"] or item.get("snippet", "No description"),
+                            "apply_link": job_url,
+                            "salary": scraped["salary"],
                             "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
-                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                            "match_score": self.calculate_match_score(skills, scraped["description"] or item.get("snippet", "")),
+                            "required_skills": scraped["required_skills"]
                         }
 
                         title_lower = (job_data["title"] or "").lower()
@@ -400,7 +595,7 @@ class SmartJobRecommenderRAG:
                         else:
                             all_jobs.append(job_data)
 
-                    time.sleep(0.5)
+                    time.sleep(1)
 
                 except Exception as e:
                     st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
@@ -488,42 +683,6 @@ class SmartJobRecommenderRAG:
 # STREAMLIT UI COMPONENTS
 # ============================================================================
 
-# def main():
-#     """Main application function"""
-#     # Add background image CSS
-#     background_css = """
-#     <style>
-#     .stApp {
-    
-#         background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");  /* Replace with your image URL */
-#         background-size: cover;
-#         background-position: center;
-#         background-attachment: fixed;
-#         background-repeat: no-repeat;
-#     }
-#     /* Improve text readability */
-#     .stApp * {
-#         color: #000000;  /* black text for contrast */
-#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Text shadow for readability */
-#     }
-#     /* Ensure sidebar text is readable */
-#     .stSidebar * {
-#         color: #000000;
-#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
-#     }
-#     /* Optional: Style buttons for better visibility */
-#     .stButton>button {
-#         background-color: #FFFFFF;
-#         color: white;
-#         border-radius: 5px;
-#         border: none;
-#     }
-#     .stButton>button:hover {
-#         background-color: #FFFFFF;
-#     }
-#     </style>
-#     """
-#     st.markdown(background_css, unsafe_allow_html=True)
 def main():
     """Main application function"""
     # Add background image CSS for light theme
@@ -668,13 +827,6 @@ def main():
 
     st.markdown(background_css, unsafe_allow_html=True)
 
-
-
-
-
-
-    
-
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
 
@@ -705,12 +857,18 @@ def main():
         except Exception:
             st.error("❌ Google Custom Search: API key and Search Engine ID required")
 
+        if SELENIUM_AVAILABLE:
+            st.success("✅ Selenium: Available for scraping")
+        else:
+            st.error("❌ Selenium: Not available. Install selenium and Chrome/Chromedriver.")
+
         st.markdown("---")
         st.subheader("📋 Instructions")
         st.markdown("""
         **Setup Required:**
         1. Add GEMINI_API_KEY to Streamlit secrets
         2. Add GOOGLE_API_KEY and SEARCH_ENGINE_ID to Streamlit secrets
+        3. Install Selenium and Chrome/Chromedriver for scraping
 
         **How to Use:**
         1. Upload your resume PDF, OR
@@ -725,6 +883,7 @@ def main():
         - Resume PDF analysis
         - Manual skill entry
         - Real-time job search via Google Custom Search
+        - Advanced scraping with Selenium for full details
         - Real-time matching scores
         - Clickable application links
         - Location-based search
@@ -1014,20 +1173,9 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
         - Quota limits reached (check Google Cloud Console)
         """)
 
-   
-
 # ============================================================================
 # RUN APPLICATION
 # ============================================================================
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
