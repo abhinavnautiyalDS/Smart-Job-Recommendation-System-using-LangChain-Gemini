@@ -5,19 +5,19 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.8):
-- Enhanced extraction of company, salary, and location from snippets using regex.
-- Added automation on "Apply Now" click: Send job and user data to n8n webhook for cover letter generation and spreadsheet storage.
-- Updated search flow: After Google Search, use Gemini to analyze snippets for better extraction of company, location, salary, skills.
+Main changes (v2.9):
+- Updated search flow: After Google Search, use Gemini to analyze snippets and extract company, location, salary, and other details in JSON format.
+- Enhanced UI to display extracted JSON data in the app.
 
 Author: AI Assistant (updated)
-Version: 2.8 (Gemini for Post-Search Extraction)
+Version: 2.9 (Gemini JSON Extraction Post-Search)
 """
 
 import streamlit as st
 import requests
 import time
 import os
+import json
 from typing import List, Dict, Any
 import tempfile
 from urllib.parse import quote_plus
@@ -211,64 +211,65 @@ class SmartJobRecommenderRAG:
         company_pattern = r'(\w+) ·'
         match = re.search(company_pattern, snippet)
         return match.group(1) if match else "Unknown Company"
-        
+
     def analyze_snippet_with_gemini(self, snippet: str) -> Dict[str, Any]:
-        """Use Gemini to analyze snippet for company, location, salary, skills"""
+        """Use Gemini to analyze snippet and return details in JSON format"""
         if not self.gemini_client:
-            return {"company": "Unknown Company", "location": "Unknown Location", "salary": "Not specified", "required_skills": []}
-    
+            return {"company": "Unknown Company", "location": "Unknown Location", "salary": "Not specified", "required_skills": [], "job_title": "Unknown Title"}
+
         prompt = f"""
-    Analyze the following job snippet and extract:
-    1. Company name
-    2. Job location
-    3. Salary (if mentioned, else 'Not specified')
-    4. Required skills (comma-separated list)
-    
-    Snippet:
-    {snippet}
-    
-    Format your response as:
-    COMPANY: [company name]
-    LOCATION: [location]
-    SALARY: [salary]
-    REQUIRED_SKILLS: [comma-separated skills]
-    """
-    
+Analyze the following job snippet and extract the following details in JSON format:
+- company: The name of the company
+- location: The job location
+- salary: The salary range or 'Not specified' if not mentioned
+- required_skills: A list of skills required for the job
+- job_title: The title of the job
+
+Snippet:
+{snippet}
+
+Return the response as a valid JSON object, e.g.:
+{{
+  "company": "Company Name",
+  "location": "City, Country",
+  "salary": "$50,000 - $70,000",
+  "required_skills": ["Python", "SQL", "Communication"],
+  "job_title": "Software Engineer"
+}}
+"""
+
         try:
             response = self.gemini_client.generate_content(prompt)
-            response_text = response.text
-    
-            company = "Unknown Company"
-            location = "Unknown Location"
-            salary = "Not specified"
-            required_skills = []
-    
-            lines = response_text.split('\n')
-            for line in lines:
-                if line.startswith('COMPANY:'):
-                    company = line.replace('COMPANY:', '').strip()
-                elif line.startswith('LOCATION:'):
-                    location = line.replace('LOCATION:', '').strip()
-                elif line.startswith('SALARY:'):
-                    salary = line.replace('SALARY:', '').strip()
-                elif line.startswith('REQUIRED_SKILLS:'):
-                    skills_text = line.replace('REQUIRED_SKILLS:', '').strip()
-                    required_skills = [s.strip() for s in skills_text.split(',') if s.strip()]
-    
-            return {
-                "company": company,
-                "location": location,
-                "salary": salary,
-                "required_skills": required_skills
-            }
-    
+            response_text = response.text.strip()
+
+            # Attempt to parse the response as JSON
+            try:
+                analysis = json.loads(response_text)
+                return {
+                    "company": analysis.get("company", "Unknown Company"),
+                    "location": analysis.get("location", "Unknown Location"),
+                    "salary": analysis.get("salary", "Not specified"),
+                    "required_skills": analysis.get("required_skills", []),
+                    "job_title": analysis.get("job_title", "Unknown Title")
+                }
+            except json.JSONDecodeError:
+                st.warning("⚠️ Gemini returned invalid JSON. Falling back to default extraction.")
+                return {
+                    "company": self.extract_company_from_snippet(snippet),
+                    "location": self.extract_location_from_snippet(snippet),
+                    "salary": self.extract_salary_from_snippet(snippet),
+                    "required_skills": self.extract_skills_from_description(snippet),
+                    "job_title": "Unknown Title"
+                }
+
         except Exception as e:
             st.warning(f"⚠️ Gemini analysis skipped due to: {e}. Falling back to default values.")
             return {
                 "company": self.extract_company_from_snippet(snippet),
                 "location": self.extract_location_from_snippet(snippet),
                 "salary": self.extract_salary_from_snippet(snippet),
-                "required_skills": self.extract_skills_from_description(snippet)
+                "required_skills": self.extract_skills_from_description(snippet),
+                "job_title": "Unknown Title"
             }
 
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
@@ -345,7 +346,7 @@ class SmartJobRecommenderRAG:
                         analysis = self.analyze_snippet_with_gemini(snippet)
 
                         job_data = {
-                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "title": analysis.get("job_title", item.get("title", "Unknown Title")) or "Unknown Title",
                             "company": analysis.get("company", "Unknown Company"),
                             "location": analysis.get("location", "Unknown Location"),
                             "description": snippet or "No description",
@@ -462,7 +463,7 @@ class SmartJobRecommenderRAG:
                         analysis = self.analyze_snippet_with_gemini(snippet)
 
                         job_data = {
-                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "title": analysis.get("job_title", item.get("title", "Unknown Title")) or "Unknown Title",
                             "company": analysis.get("company", "Unknown Company"),
                             "location": analysis.get("location", "Unknown Location"),
                             "description": snippet or "No description",
@@ -896,7 +897,7 @@ def process_manual_skills_and_find_jobs(manual_data: Dict[str, Any], location_pr
         status_text.empty()
 
 def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]):
-    """Display analysis results and job recommendations"""
+    """Display analysis results and job recommendations with JSON details"""
     st.markdown("---")
     st.header("📊 Analysis Results")
 
@@ -940,15 +941,27 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
                     st.write(f"**Company:** {job['company']}")
                     st.write(f"**Location:** {job['location']}")
                     st.write(f"**Salary:** {job.get('salary', 'Not specified')}")
-                    st.write(f"**Description:** {job.get('description','')[:200]}...")
+                    st.write(f"**Description:** {job.get('description', '')[:200]}...")
+                    st.write(f"**Job Title:** {job['title']}")
 
                     if job.get('required_skills'):
                         st.write("**Required Skills:**")
                         for skill in job.get('required_skills', []):
                             st.markdown(f"• {skill}")
 
+                    # Display raw JSON from Gemini analysis
+                    st.subheader("Detailed JSON Analysis")
+                    analysis_json = {
+                        "company": job['company'],
+                        "location": job['location'],
+                        "salary": job['salary'],
+                        "required_skills": job['required_skills'],
+                        "job_title": job['title']
+                    }
+                    st.json(analysis_json)
+
                 with col2:
-                    st.metric("Match Score", f"{job.get('match_score',0)}%")
+                    st.metric("Match Score", f"{job.get('match_score', 0)}%")
                     st.write(f"**Source:** {job.get('source', 'Unknown')}")
 
                     apply_link_local = (job.get('apply_link') or '').strip()
@@ -981,21 +994,33 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
         st.subheader(f"🎓 Found {len(internships)} Internship Matches")
 
         for i, internship in enumerate(internships, 1):
-            with st.expander(f"#{i} {internship['title']} at {internship['company']} - {internship.get('match_score',0)}% Match"):
+            with st.expander(f"#{i} {internship['title']} at {internship['company']} - {internship.get('match_score', 0)}% Match"):
                 col1, col2 = st.columns([2, 1])
 
                 with col1:
                     st.write(f"**Company:** {internship['company']}")
-                    st.write(f"**Location:** {internship.get('location','')}")
-                    st.write(f"**Description:** {internship.get('description','')[:200]}...")
+                    st.write(f"**Location:** {internship['location']}")
+                    st.write(f"**Description:** {internship.get('description', '')[:200]}...")
+                    st.write(f"**Job Title:** {internship['title']}")
 
                     if internship.get('required_skills'):
                         st.write("**Required Skills:**")
                         for skill in internship.get('required_skills', []):
                             st.markdown(f"• {skill}")
 
+                    # Display raw JSON from Gemini analysis
+                    st.subheader("Detailed JSON Analysis")
+                    analysis_json = {
+                        "company": internship['company'],
+                        "location": internship['location'],
+                        "salary": internship['salary'],
+                        "required_skills": internship['required_skills'],
+                        "job_title": internship['title']
+                    }
+                    st.json(analysis_json)
+
                 with col2:
-                    st.metric("Match Score", f"{internship.get('match_score',0)}%")
+                    st.metric("Match Score", f"{internship.get('match_score', 0)}%")
                     st.write(f"**Source:** {internship.get('source', 'Unknown')}")
 
                     internship_apply = (internship.get('apply_link') or '').strip()
