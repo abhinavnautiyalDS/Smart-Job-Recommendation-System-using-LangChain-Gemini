@@ -267,26 +267,74 @@ class SmartJobRecommenderRAG:
                         st.warning(f"No results found for query: {query}")
                         continue
 
-                    for item in data[items_key]:
-                        job_data = {
-                            "title": item.get("title", "Unknown Title") or "Unknown Title",
-                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
-                            "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
-                            "description": item.get("snippet", "No description") or "No description",
-                            "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": "Not specified",
-                            "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
-                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
-                        }
+                    # for item in data[items_key]:
+                    #     job_data = {
+                    #         "title": item.get("title", "Unknown Title") or "Unknown Title",
+                    #         "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                    #         "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
+                    #         "description": item.get("snippet", "No description") or "No description",
+                    #         "apply_link": self.get_best_apply_link(item, response_data=data),
+                    #         "salary": "Not specified",
+                    #         "source": "Google Custom Search",
+                    #         "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                    #         "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                    #     }
 
-                        title_lower = (job_data["title"] or "").lower()
-                        if any(word in title_lower for word in ["intern", "internship", "trainee"]):
-                            all_internships.append(job_data)
-                        else:
-                            all_jobs.append(job_data)
+                    #     title_lower = (job_data["title"] or "").lower()
+                    #     if any(word in title_lower for word in ["intern", "internship", "trainee"]):
+                    #         all_internships.append(job_data)
+                    #     else:
+                    #         all_jobs.append(job_data)
 
+                    # time.sleep(0.5)
+
+                for item in data[items_key]:
+                    pagemap = item.get("pagemap", {})
+                    metatags = pagemap.get("metatags", [{}])[0]
+                
+                    # Extract company
+                    company = (
+                        metatags.get("og:site_name")
+                        or pagemap.get("organization", [{}])[0].get("name")
+                        or pagemap.get("hcard", [{}])[0].get("fn")
+                        or "Unknown Company"
+                    )
+                
+                    # Extract location
+                    location = (
+                        metatags.get("og:locality")
+                        or pagemap.get("place", [{}])[0].get("name")
+                        or pagemap.get("postaladdress", [{}])[0].get("addressLocality")
+                        or "Unknown Location"
+                    )
+                
+                    # Salary (often not available in Google Search, fallback to description parsing)
+                    salary = (
+                        pagemap.get("offer", [{}])[0].get("salary")
+                        or self.extract_salary_from_snippet(item.get("snippet", ""))
+                        or "Not specified"
+                    )
+                
+                    job_data = {
+                        "title": item.get("title", "Unknown Title") or "Unknown Title",
+                        "company": company,
+                        "location": location,
+                        "description": item.get("snippet", "No description") or "No description",
+                        "apply_link": self.get_best_apply_link(item, response_data=data),
+                        "salary": salary,
+                        "source": "Google Custom Search",
+                        "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                        "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                    }
+                
+                    title_lower = (job_data["title"] or "").lower()
+                    if any(word in title_lower for word in ["intern", "internship", "trainee"]):
+                        all_internships.append(job_data)
+                    else:
+                        all_jobs.append(job_data)
+                
                     time.sleep(0.5)
+
 
                 except Exception as e:
                     st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
