@@ -803,7 +803,7 @@ def main():
         1. Upload your resume PDF, OR
         2. Enter your skills manually
         3. Get personalized job recommendations
-        4. Click 'Apply Now' to apply directly or trigger n8n workflow
+        4. Click 'Apply Now' to apply directly
         """)
 
         st.markdown("---")
@@ -814,7 +814,6 @@ def main():
         - Real-time job search via Google Custom Search
         - Real-time matching scores
         - Clickable application links
-        - n8n workflow integration
         - Location-based search
         """)
 
@@ -886,10 +885,6 @@ def main():
                     process_manual_skills_and_find_jobs(manual_data, location_pref)
                 else:
                     st.error("Please enter at least some skills to find matching jobs.")
-
-    # Add "Apply" button outside tabs to trigger n8n webhook
-    if st.button("Apply"):
-        trigger_n8n_webhook()
 
 def process_resume_and_find_jobs(uploaded_file):
     """Process uploaded resume and find matching jobs"""
@@ -1112,6 +1107,11 @@ def trigger_n8n_webhook():
         st.success("Webhook triggered successfully!")
     else:
         st.error("Failed to trigger webhook.")
+
+if st.button("Apply"):
+    trigger_n8n_webhook()
+
+
 
 # ============================================================================
 # RUN APPLICATION
