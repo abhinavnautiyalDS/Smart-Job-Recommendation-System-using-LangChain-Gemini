@@ -5,19 +5,15 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.8):
-- Fixed company name extraction to avoid job board names (e.g., Indeed, LinkedIn).
-- Enhanced company extraction with stricter regex and metadata prioritization.
-- Improved location and salary extraction with better pattern matching.
-- Added debug output for company name extraction.
-- Added background image via CSS.
-- Expanded search queries for diversity.
-- Relaxed duplicate removal using apply_link.
-- Increased result limit to 10 per query.
-- Enhanced error handling for empty results.
+Main changes (v2.9):
+- Added site-specific parsing for title, company, location, salary from LinkedIn, Indeed, Glassdoor.
+- Updated salary extraction patterns to include common formats like "Estimated $85.5K - $108K a year", "$60 - $65 an hour".
+- Added parse_job_data method to handle extraction logic based on site.
+- Improved fallback to snippet parsing if not parsed from title.
+- Enhanced debug output for parsing.
 
 Author: AI Assistant (updated)
-Version: 2.8 (Improved Company Name Extraction)
+Version: 2.9 (Site-Specific Parsing for Job Data)
 """
 
 import streamlit as st
@@ -188,6 +184,100 @@ class SmartJobRecommenderRAG:
 
         return ""
 
+    def parse_job_data(self, item: Dict, skills: List[str], default_location: str = "Unknown Location") -> Dict:
+        """Parse job data from Google Custom Search item based on site"""
+        title_str = item.get("title", "Unknown Title")
+        snippet = item.get("snippet", "No description")
+        link = item.get("link", "")
+        pagemap = item.get("pagemap", {})
+        metatags = pagemap.get("metatags", [{}])[0]
+
+        site = "other"
+        if 'linkedin.com' in link:
+            site = "linkedin"
+        elif 'indeed.com' in link:
+            site = "indeed"
+        elif 'glassdoor.com' in link:
+            site = "glassdoor"
+
+        job_title = "Unknown Title"
+        company = "Unknown Company"
+        location = default_location
+        salary = self.extract_salary_from_snippet(snippet)
+        description = snippet
+        apply_link = self.get_best_apply_link(item)
+        match_score = self.calculate_match_score(skills, snippet)
+        required_skills = self.extract_skills_from_description(snippet)
+
+        # Site-specific parsing
+        if site == "linkedin":
+            if ' hiring ' in title_str:
+                parts = title_str.split(' hiring ')
+                company = parts[0].strip()
+                rest = parts[1].replace(' - LinkedIn', '').replace(' | LinkedIn', '').strip()
+                if ' in ' in rest:
+                    job_title = rest.split(' in ')[0].strip()
+                    location = rest.split(' in ')[1].strip()
+                else:
+                    job_title = rest
+            else:
+                job_title = title_str.replace(' | LinkedIn', '').replace(' - LinkedIn', '').strip()
+
+        elif site == "indeed":
+            title_str = title_str.replace(' | Indeed.com', '').replace(' - Indeed', '').strip()
+            parts = title_str.split(' - ')
+            job_title = parts[0].strip()
+            if len(parts) > 1:
+                location = parts[1].strip()
+
+            # Company and possibly salary from snippet
+            snippet_lines = snippet.split('\n')
+            if snippet_lines:
+                for line in snippet_lines:
+                    if ' · ' in line:
+                        parts = line.split(' · ')
+                        if len(parts) > 0:
+                            company = parts[0].strip()
+                        if len(parts) > 1:
+                            location = parts[1].strip()
+                        if len(parts) > 2:
+                            salary = parts[2].strip()
+                        break
+
+        elif site == "glassdoor":
+            title_str = title_str.replace(' | Glassdoor', '').replace(' - Glassdoor', '').strip()
+            parts = title_str.split(' - ')
+            job_title = parts[0].strip()
+            if len(parts) > 1:
+                company = parts[1].strip()
+            if len(parts) > 2:
+                location = parts[2].strip()
+
+        # Fallback extractions
+        if company == "Unknown Company":
+            company = self.extract_company_from_snippet(snippet, title_str) or metatags.get("og:site_name", "Unknown Company")
+
+        if location == "Unknown Location":
+            location = self.extract_location_from_snippet(snippet, title_str)
+
+        if salary == "Not specified":
+            salary = pagemap.get("offer", [{}])[0].get("salary", "Not specified")
+
+        # Debug
+        st.write(f"Debug: Parsed from {site} - Title: {job_title}, Company: {company}, Location: {location}, Salary: {salary}")
+
+        return {
+            "title": job_title,
+            "company": company,
+            "location": location,
+            "description": description,
+            "apply_link": apply_link,
+            "salary": salary,
+            "source": site.capitalize(),
+            "match_score": match_score,
+            "required_skills": required_skills
+        }
+
     def extract_company_from_snippet(self, snippet: str, title: str) -> str:
         """Extract company name from snippet or title, avoiding job board names"""
         if not snippet and not title:
@@ -198,12 +288,11 @@ class SmartJobRecommenderRAG:
             "simplyhired", "dice", "jobstreet", "jobsdb"
         ]
 
-        # Common company name patterns
         patterns = [
-            r'at\s+([A-Za-z0-9\s&-]+?)(?:\s*[-|]\s*(?:jobs|careers|apply))?',  # e.g., "at Google -"
-            r'([A-Za-z0-9\s&-]+?)\s*is\s+hiring',  # e.g., "Google is hiring"
-            r'([A-Za-z0-9\s&-]+?)\s*(?:Careers|Jobs)',  # e.g., "Google Careers"
-            r'([A-Za-z0-9\s&-]+?)\s*[-|]\s*\w+\s*(?:Engineer|Developer|Manager)'  # e.g., "Google - Software Engineer"
+            r'at\s+([A-Za-z0-9\s&-]+?)(?:\s*[-|]\s*(?:jobs|careers|apply))?',  
+            r'([A-Za-z0-9\s&-]+?)\s*is\s+hiring',  
+            r'([A-Za-z0-9\s&-]+?)\s*(?:Careers|Jobs)',  
+            r'([A-Za-z0-9\s&-]+?)\s*[-|]\s*\w+\s*(?:Engineer|Developer|Manager)'  
         ]
 
         combined_text = title + " " + snippet
@@ -211,12 +300,10 @@ class SmartJobRecommenderRAG:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match and match.group(1).strip():
                 company_name = match.group(1).strip()
-                # Avoid job board names
                 if not any(jb.lower() in company_name.lower() for jb in job_boards):
                     st.write(f"Debug: Extracted company '{company_name}' from pattern: {pattern}")
                     return company_name
 
-        # Check for common companies in the text
         common_companies = [
             "Google", "Amazon", "Microsoft", "Apple", "Meta", "Tesla", "IBM",
             "Oracle", "Accenture", "Deloitte", "Salesforce", "Adobe"
@@ -235,12 +322,12 @@ class SmartJobRecommenderRAG:
             return "Unknown Location"
 
         patterns = [
-            r'in\s+([A-Za-z\s,]+),\s*[A-Z]{2}',  # e.g., "in New York, NY"
-            r'([A-Za-z\s]+),\s*[A-Z]{2}',  # e.g., "New York, NY"
-            r'based\s+in\s+([A-Za-z\s]+)',  # e.g., "based in Seattle"
-            r'([A-Za-z\s]+)\s+\(Remote\)',  # e.g., "New York (Remote)"
-            r'remote\s+([A-Za-z\s]+)',  # e.g., "remote New York"
-            r'location:\s*([A-Za-z\s,]+)'  # e.g., "Location: San Francisco"
+            r'in\s+([A-Za-z\s,]+),\s*[A-Z]{2}',  
+            r'([A-Za-z\s]+),\s*[A-Z]{2}',  
+            r'based\s+in\s+([A-Za-z\s]+)',  
+            r'([A-Za-z\s]+)\s+\(Remote\)',  
+            r'remote\s+([A-Za-z\s]+)',  
+            r'location:\s*([A-Za-z\s,]+)'  
         ]
 
         combined_text = title + " " + snippet
@@ -268,10 +355,13 @@ class SmartJobRecommenderRAG:
             return "Not specified"
 
         patterns = [
-            r'\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?\s*(?:per\s+(?:year|hour|month))?',  # e.g., "$100,000 - $120,000 per year"
-            r'[\d,]+(?:\.\d{2})?k(?:\s*-\s*[\d,]+(?:\.\d{2})?k)?\s*(?:per\s+year)?',  # e.g., "100k - 120k per year"
-            r'\$[\d,]+(?:\.\d{2})?\s*(?:per\s+(?:year|hour|month))',  # e.g., "$100,000 per year"
-            r'salary:\s*\$?[\d,]+(?:\.\d{2})?(?:k)?\s*(?:-\s*\$?[\d,]+(?:\.\d{2})?(?:k)?)?'  # e.g., "Salary: $100,000 - $120,000"
+            r'\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?\s*(?:per\s+(?:year|hour|month))?',
+            r'[\d,]+(?:\.\d{2})?k(?:\s*-\s*[\d,]+(?:\.\d{2})?k)?\s*(?:per\s+year)?',
+            r'\$[\d,]+(?:\.\d{2})?\s*(?:per\s+(?:year|hour|month))',
+            r'Estimated \$[\d.]+K? - \$[\d.]+K? a year',
+            r'\$[\d.]+ - \$[\d.]+ an hour',
+            r'\$[\d,]+ - \$[\d,]+ a year',
+            r'Salary: \$?[\d,]+(?:\.\d{2})?(?:k)?\s*(?:-\s*\$?[\d,]+(?:\.\d{2})?(?:k)?)?'
         ]
 
         for pattern in patterns:
@@ -348,43 +438,9 @@ class SmartJobRecommenderRAG:
                         continue
 
                     for item in items:
-                        pagemap = item.get("pagemap", {})
-                        metatags = pagemap.get("metatags", [{}])[0]
-                        snippet = item.get("snippet", "")
-                        title = item.get("title", "Unknown Title")
+                        job_data = self.parse_job_data(item, skills)
 
-                        company = (
-                            pagemap.get("organization", [{}])[0].get("name")
-                            or metatags.get("og:site_name")
-                            or pagemap.get("hcard", [{}])[0].get("fn")
-                            or self.extract_company_from_snippet(snippet, title)
-                        )
-
-                        location = (
-                            metatags.get("og:locality")
-                            or pagemap.get("place", [{}])[0].get("name")
-                            or pagemap.get("postaladdress", [{}])[0].get("addressLocality")
-                            or self.extract_location_from_snippet(snippet, title)
-                        )
-
-                        salary = (
-                            pagemap.get("offer", [{}])[0].get("salary")
-                            or self.extract_salary_from_snippet(snippet)
-                        )
-
-                        job_data = {
-                            "title": title or "Unknown Title",
-                            "company": company,
-                            "location": location,
-                            "description": snippet or "No description",
-                            "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": salary,
-                            "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, snippet),
-                            "required_skills": self.extract_skills_from_description(snippet)
-                        }
-
-                        title_lower = title.lower()
+                        title_lower = job_data["title"].lower()
                         if any(word in title_lower for word in ["intern", "internship", "trainee"]):
                             all_internships.append(job_data)
                         else:
@@ -481,36 +537,9 @@ class SmartJobRecommenderRAG:
                         continue
 
                     for item in items:
-                        pagemap = item.get("pagemap", {})
-                        metatags = pagemap.get("metatags", [{}])[0]
-                        snippet = item.get("snippet", "")
-                        title = item.get("title", "Unknown Title")
+                        job_data = self.parse_job_data(item, skills, location)
 
-                        company = (
-                            pagemap.get("organization", [{}])[0].get("name")
-                            or metatags.get("og:site_name")
-                            or pagemap.get("hcard", [{}])[0].get("fn")
-                            or self.extract_company_from_snippet(snippet, title)
-                        )
-
-                        salary = (
-                            pagemap.get("offer", [{}])[0].get("salary")
-                            or self.extract_salary_from_snippet(snippet)
-                        )
-
-                        job_data = {
-                            "title": title or "Unknown Title",
-                            "company": company,
-                            "location": location,
-                            "description": snippet or "No description",
-                            "apply_link": self.get_best_apply_link(item, response_data=data),
-                            "salary": salary,
-                            "source": "Google Custom Search",
-                            "match_score": self.calculate_match_score(skills, snippet),
-                            "required_skills": self.extract_skills_from_description(snippet)
-                        }
-
-                        title_lower = title.lower()
+                        title_lower = job_data["title"].lower()
                         if any(word in title_lower for word in ["intern", "internship", "trainee"]):
                             all_internships.append(job_data)
                         else:
