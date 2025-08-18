@@ -1099,6 +1099,20 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
         - Quota limits reached (check Google Cloud Console)
         """)
 
+def trigger_n8n_webhook():
+    webhook_url = "https://abhinaut-app.n8n.cloud/webhook-test/e73fcd5f-b267-450b-9ac9-d274e46d957d"
+    headers = {"Content-Type": "application/json"}  # Optional, based on n8n requirements
+    response = requests.get(webhook_url, headers=headers)
+    if response.status_code == 200:
+        st.success("Webhook triggered successfully!")
+    else:
+        st.error("Failed to trigger webhook.")
+
+if st.button("Apply"):
+    trigger_n8n_webhook()
+
+
+
 # ============================================================================
 # RUN APPLICATION
 # ============================================================================
