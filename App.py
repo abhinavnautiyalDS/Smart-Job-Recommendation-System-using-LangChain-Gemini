@@ -211,38 +211,38 @@ class SmartJobRecommenderRAG:
         company_pattern = r'(\w+) ·'
         match = re.search(company_pattern, snippet)
         return match.group(1) if match else "Unknown Company"
-
+        
     def analyze_snippet_with_gemini(self, snippet: str) -> Dict[str, Any]:
         """Use Gemini to analyze snippet for company, location, salary, skills"""
         if not self.gemini_client:
             return {"company": "Unknown Company", "location": "Unknown Location", "salary": "Not specified", "required_skills": []}
-
+    
         prompt = f"""
-Analyze the following job snippet and extract:
-1. Company name
-2. Job location
-3. Salary (if mentioned, else 'Not specified')
-4. Required skills (comma-separated list)
-
-Snippet:
-{snippet}
-
-Format your response as:
-COMPANY: [company name]
-LOCATION: [location]
-SALARY: [salary]
-REQUIRED_SKILLS: [comma-separated skills]
-"""
-
+    Analyze the following job snippet and extract:
+    1. Company name
+    2. Job location
+    3. Salary (if mentioned, else 'Not specified')
+    4. Required skills (comma-separated list)
+    
+    Snippet:
+    {snippet}
+    
+    Format your response as:
+    COMPANY: [company name]
+    LOCATION: [location]
+    SALARY: [salary]
+    REQUIRED_SKILLS: [comma-separated skills]
+    """
+    
         try:
             response = self.gemini_client.generate_content(prompt)
             response_text = response.text
-
+    
             company = "Unknown Company"
             location = "Unknown Location"
             salary = "Not specified"
             required_skills = []
-
+    
             lines = response_text.split('\n')
             for line in lines:
                 if line.startswith('COMPANY:'):
@@ -254,17 +254,22 @@ REQUIRED_SKILLS: [comma-separated skills]
                 elif line.startswith('REQUIRED_SKILLS:'):
                     skills_text = line.replace('REQUIRED_SKILLS:', '').strip()
                     required_skills = [s.strip() for s in skills_text.split(',') if s.strip()]
-
+    
             return {
                 "company": company,
                 "location": location,
                 "salary": salary,
                 "required_skills": required_skills
             }
-
+    
         except Exception as e:
-            st.error(f"❌ Error analyzing snippet with Gemini: {e}")
-            return {"company": "Unknown Company", "location": "Unknown Location", "salary": "Not specified", "required_skills": []}
+            st.warning(f"⚠️ Gemini analysis skipped due to: {e}. Falling back to default values.")
+            return {
+                "company": self.extract_company_from_snippet(snippet),
+                "location": self.extract_location_from_snippet(snippet),
+                "salary": self.extract_salary_from_snippet(snippet),
+                "required_skills": self.extract_skills_from_description(snippet)
+            }
 
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
         """Search jobs using Google Custom Search JSON API and enhance with Gemini analysis"""
