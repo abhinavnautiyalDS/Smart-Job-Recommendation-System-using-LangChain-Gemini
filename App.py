@@ -5,19 +5,19 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.7):
-- Improved company name extraction using multiple metadata fields and snippet parsing.
-- Enhanced location extraction with additional metadata checks and snippet analysis.
-- Improved salary extraction with pattern matching for common salary formats.
+Main changes (v2.8):
+- Fixed company name extraction to avoid job board names (e.g., Indeed, LinkedIn).
+- Enhanced company extraction with stricter regex and metadata prioritization.
+- Improved location and salary extraction with better pattern matching.
+- Added debug output for company name extraction.
 - Added background image via CSS.
 - Expanded search queries for diversity.
 - Relaxed duplicate removal using apply_link.
-- Added debug output for API responses and queries.
 - Increased result limit to 10 per query.
 - Enhanced error handling for empty results.
 
 Author: AI Assistant (updated)
-Version: 2.7 (Enhanced Data Extraction)
+Version: 2.8 (Improved Company Name Extraction)
 """
 
 import streamlit as st
@@ -189,38 +189,44 @@ class SmartJobRecommenderRAG:
         return ""
 
     def extract_company_from_snippet(self, snippet: str, title: str) -> str:
-        """Extract company name from snippet or title"""
+        """Extract company name from snippet or title, avoiding job board names"""
         if not snippet and not title:
             return "Unknown Company"
 
+        job_boards = [
+            "indeed", "linkedin", "glassdoor", "monster", "careerbuilder",
+            "simplyhired", "dice", "jobstreet", "jobsdb"
+        ]
+
         # Common company name patterns
         patterns = [
-            r'at\s+([A-Za-z0-9\s&-]+)\s*-',  # e.g., "at Google -"
-            r'([A-Za-z0-9\s&-]+)\s*is\s+hiring',  # e.g., "Google is hiring"
-            r'([A-Za-z0-9\s&-]+)\s*Careers',  # e.g., "Google Careers"
+            r'at\s+([A-Za-z0-9\s&-]+?)(?:\s*[-|]\s*(?:jobs|careers|apply))?',  # e.g., "at Google -"
+            r'([A-Za-z0-9\s&-]+?)\s*is\s+hiring',  # e.g., "Google is hiring"
+            r'([A-Za-z0-9\s&-]+?)\s*(?:Careers|Jobs)',  # e.g., "Google Careers"
+            r'([A-Za-z0-9\s&-]+?)\s*[-|]\s*\w+\s*(?:Engineer|Developer|Manager)'  # e.g., "Google - Software Engineer"
         ]
 
-        # Try title first
+        combined_text = title + " " + snippet
         for pattern in patterns:
-            match = re.search(pattern, title, re.IGNORECASE)
+            match = re.search(pattern, combined_text, re.IGNORECASE)
             if match and match.group(1).strip():
-                return match.group(1).strip()
+                company_name = match.group(1).strip()
+                # Avoid job board names
+                if not any(jb.lower() in company_name.lower() for jb in job_boards):
+                    st.write(f"Debug: Extracted company '{company_name}' from pattern: {pattern}")
+                    return company_name
 
-        # Then try snippet
-        for pattern in patterns:
-            match = re.search(pattern, snippet, re.IGNORECASE)
-            if match and match.group(1).strip():
-                return match.group(1).strip()
-
-        # Fallback to common company names
+        # Check for common companies in the text
         common_companies = [
-            "Google", "Amazon", "Microsoft", "Apple", "Facebook", "Meta", "LinkedIn",
-            "Indeed", "Glassdoor", "Monster", "CareerBuilder"
+            "Google", "Amazon", "Microsoft", "Apple", "Meta", "Tesla", "IBM",
+            "Oracle", "Accenture", "Deloitte", "Salesforce", "Adobe"
         ]
         for company in common_companies:
-            if company.lower() in (snippet.lower() + title.lower()):
+            if company.lower() in combined_text.lower():
+                st.write(f"Debug: Extracted company '{company}' from common companies list")
                 return company
 
+        st.write(f"Debug: Could not extract company from snippet: '{snippet}' or title: '{title}'")
         return "Unknown Company"
 
     def extract_location_from_snippet(self, snippet: str, title: str) -> str:
@@ -228,30 +234,32 @@ class SmartJobRecommenderRAG:
         if not snippet and not title:
             return "Unknown Location"
 
-        # Common location patterns
         patterns = [
             r'in\s+([A-Za-z\s,]+),\s*[A-Z]{2}',  # e.g., "in New York, NY"
             r'([A-Za-z\s]+),\s*[A-Z]{2}',  # e.g., "New York, NY"
             r'based\s+in\s+([A-Za-z\s]+)',  # e.g., "based in Seattle"
             r'([A-Za-z\s]+)\s+\(Remote\)',  # e.g., "New York (Remote)"
             r'remote\s+([A-Za-z\s]+)',  # e.g., "remote New York"
+            r'location:\s*([A-Za-z\s,]+)'  # e.g., "Location: San Francisco"
         ]
 
         combined_text = title + " " + snippet
         for pattern in patterns:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match and match.group(1).strip():
+                st.write(f"Debug: Extracted location '{match.group(1).strip()}' from pattern: {pattern}")
                 return match.group(1).strip()
 
-        # Check for common locations
         common_locations = [
             "New York", "San Francisco", "Seattle", "Austin", "Boston", "Chicago",
             "Los Angeles", "Remote", "London", "Toronto", "Bangalore", "Mumbai"
         ]
         for loc in common_locations:
             if loc.lower() in combined_text.lower():
+                st.write(f"Debug: Extracted location '{loc}' from common locations list")
                 return loc
 
+        st.write(f"Debug: Could not extract location from snippet: '{snippet}' or title: '{title}'")
         return "Unknown Location"
 
     def extract_salary_from_snippet(self, snippet: str) -> str:
@@ -259,18 +267,20 @@ class SmartJobRecommenderRAG:
         if not snippet:
             return "Not specified"
 
-        # Common salary patterns
         patterns = [
-            r'\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?\s*(?:per\s+(?:year|hour|month))?',  # e.g., "$100,000 - $120,000 per year" or "$50 per hour"
+            r'\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?\s*(?:per\s+(?:year|hour|month))?',  # e.g., "$100,000 - $120,000 per year"
             r'[\d,]+(?:\.\d{2})?k(?:\s*-\s*[\d,]+(?:\.\d{2})?k)?\s*(?:per\s+year)?',  # e.g., "100k - 120k per year"
             r'\$[\d,]+(?:\.\d{2})?\s*(?:per\s+(?:year|hour|month))',  # e.g., "$100,000 per year"
+            r'salary:\s*\$?[\d,]+(?:\.\d{2})?(?:k)?\s*(?:-\s*\$?[\d,]+(?:\.\d{2})?(?:k)?)?'  # e.g., "Salary: $100,000 - $120,000"
         ]
 
         for pattern in patterns:
             match = re.search(pattern, snippet, re.IGNORECASE)
             if match:
+                st.write(f"Debug: Extracted salary '{match.group(0).strip()}' from pattern: {pattern}")
                 return match.group(0).strip()
 
+        st.write(f"Debug: Could not extract salary from snippet: '{snippet}'")
         return "Not specified"
 
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
@@ -344,8 +354,8 @@ class SmartJobRecommenderRAG:
                         title = item.get("title", "Unknown Title")
 
                         company = (
-                            metatags.get("og:site_name")
-                            or pagemap.get("organization", [{}])[0].get("name")
+                            pagemap.get("organization", [{}])[0].get("name")
+                            or metatags.get("og:site_name")
                             or pagemap.get("hcard", [{}])[0].get("fn")
                             or self.extract_company_from_snippet(snippet, title)
                         )
@@ -477,8 +487,8 @@ class SmartJobRecommenderRAG:
                         title = item.get("title", "Unknown Title")
 
                         company = (
-                            metatags.get("og:site_name")
-                            or pagemap.get("organization", [{}])[0].get("name")
+                            pagemap.get("organization", [{}])[0].get("name")
+                            or metatags.get("og:site_name")
                             or pagemap.get("hcard", [{}])[0].get("fn")
                             or self.extract_company_from_snippet(snippet, title)
                         )
