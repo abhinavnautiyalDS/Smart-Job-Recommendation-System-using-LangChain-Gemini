@@ -197,147 +197,148 @@ class SmartJobRecommenderRAG:
                             return s
 
         return ""
-
+        
    def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
+       
     """Search jobs using Google Custom Search JSON API"""
-    try:
-        # Load API credentials
         try:
-            google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
-        except Exception:
-            google_api_key = os.environ.get("GOOGLE_API_KEY")
-            search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
-
-        if not google_api_key or not search_engine_id:
-            st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
-            return {"jobs": [], "internships": [], "search_queries": []}
-
-        # Build queries
-        search_queries = []
-        if skills:
-            primary_skills = skills[:3]  # Use top 3 skills for diversity
-            for skill in primary_skills:
-                search_queries.extend([
-                    f"{skill} developer jobs",
-                    f"{skill} engineer jobs",
-                    f"{skill} full-time jobs",
-                    f"{skill} job openings"
-                ])
-
-        if job_interests:
-            for interest in job_interests[:3]:  # Use top 3 interests
-                search_queries.extend([
-                    f"{interest} jobs",
-                    f"{interest} careers",
-                    f"{interest} opportunities"
-                ])
-
-        if not search_queries:
-            search_queries = ["software developer jobs", "python developer jobs", "data scientist jobs"]
-
-        st.write(f"🔍 Generated search queries: {search_queries}")  # Debug
-
-        all_jobs = []
-        all_internships = []
-        url = "https://www.googleapis.com/customsearch/v1"
-
-        # Perform search
-        for query in search_queries[:5]:
+            # Load API credentials
             try:
-                params = {
-                    "key": google_api_key,
-                    "cx": search_engine_id,
-                    "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
-                    "num": 10,
-                    "safe": "off"
-                }
-
-                st.info(f"🔍 Searching Google Custom Search for '{query}'...")
-                response = requests.get(url, params=params, timeout=15)
-                st.write(f"API Response Status: {response.status_code}")  # Debug
-
-                if response.status_code != 200:
-                    st.warning(f"API Error: {response.text}")
-                    continue
-
-                data = response.json()
-                items = data.get("items", [])
-                st.write(f"API Response Items: {len(items)}")  # Debug
-
-                if not items:
-                    st.warning(f"No results found for query: {query}")
-                    continue
-
-                for item in items:
-                    pagemap = item.get("pagemap", {})
-                    metatags = pagemap.get("metatags", [{}])[0]
-
-                    # Extract company
-                    company = (
-                        metatags.get("og:site_name")
-                        or pagemap.get("organization", [{}])[0].get("name")
-                        or pagemap.get("hcard", [{}])[0].get("fn")
-                        or "Unknown Company"
-                    )
-
-                    # Extract location
-                    location = (
-                        metatags.get("og:locality")
-                        or pagemap.get("place", [{}])[0].get("name")
-                        or pagemap.get("postaladdress", [{}])[0].get("addressLocality")
-                        or "Unknown Location"
-                    )
-
-                    # Extract salary
-                    salary = (
-                        pagemap.get("offer", [{}])[0].get("salary")
-                        or self.extract_salary_from_snippet(item.get("snippet", ""))
-                        or "Not specified"
-                    )
-
-                    job_data = {
-                        "title": item.get("title", "Unknown Title") or "Unknown Title",
-                        "company": company,
-                        "location": location,
-                        "description": item.get("snippet", "No description") or "No description",
-                        "apply_link": self.get_best_apply_link(item, response_data=data),
-                        "salary": salary,
-                        "source": "Google Custom Search",
-                        "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
-                        "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
+            except Exception:
+                google_api_key = os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
+    
+            if not google_api_key or not search_engine_id:
+                st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
+                return {"jobs": [], "internships": [], "search_queries": []}
+    
+            # Build queries
+            search_queries = []
+            if skills:
+                primary_skills = skills[:3]  # Use top 3 skills for diversity
+                for skill in primary_skills:
+                    search_queries.extend([
+                        f"{skill} developer jobs",
+                        f"{skill} engineer jobs",
+                        f"{skill} full-time jobs",
+                        f"{skill} job openings"
+                    ])
+    
+            if job_interests:
+                for interest in job_interests[:3]:  # Use top 3 interests
+                    search_queries.extend([
+                        f"{interest} jobs",
+                        f"{interest} careers",
+                        f"{interest} opportunities"
+                    ])
+    
+            if not search_queries:
+                search_queries = ["software developer jobs", "python developer jobs", "data scientist jobs"]
+    
+            st.write(f"🔍 Generated search queries: {search_queries}")  # Debug
+    
+            all_jobs = []
+            all_internships = []
+            url = "https://www.googleapis.com/customsearch/v1"
+    
+            # Perform search
+            for query in search_queries[:5]:
+                try:
+                    params = {
+                        "key": google_api_key,
+                        "cx": search_engine_id,
+                        "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
+                        "num": 10,
+                        "safe": "off"
                     }
-
-                    title_lower = (job_data["title"] or "").lower()
-                    if any(word in title_lower for word in ["intern", "internship", "trainee"]):
-                        all_internships.append(job_data)
-                    else:
-                        all_jobs.append(job_data)
-
-                    time.sleep(0.5)
-
-            except Exception as e:
-                st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
-                continue
-
-        # Remove duplicates & sort
-        unique_jobs = self.remove_duplicates(all_jobs)
-        unique_internships = self.remove_duplicates(all_internships)
-
-        unique_jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
-        unique_internships.sort(key=lambda x: x.get("match_score", 0), reverse=True)
-
-        st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
-
-        return {
-            "jobs": unique_jobs[:20],
-            "internships": unique_internships[:10],
-            "search_queries": search_queries[:8]
-        }
-
-    except Exception as e:
-        st.error(f"❌ Error with job search: {e}")
-        return {"jobs": [], "internships": [], "search_queries": []}
+    
+                    st.info(f"🔍 Searching Google Custom Search for '{query}'...")
+                    response = requests.get(url, params=params, timeout=15)
+                    st.write(f"API Response Status: {response.status_code}")  # Debug
+    
+                    if response.status_code != 200:
+                        st.warning(f"API Error: {response.text}")
+                        continue
+    
+                    data = response.json()
+                    items = data.get("items", [])
+                    st.write(f"API Response Items: {len(items)}")  # Debug
+    
+                    if not items:
+                        st.warning(f"No results found for query: {query}")
+                        continue
+    
+                    for item in items:
+                        pagemap = item.get("pagemap", {})
+                        metatags = pagemap.get("metatags", [{}])[0]
+    
+                        # Extract company
+                        company = (
+                            metatags.get("og:site_name")
+                            or pagemap.get("organization", [{}])[0].get("name")
+                            or pagemap.get("hcard", [{}])[0].get("fn")
+                            or "Unknown Company"
+                        )
+    
+                        # Extract location
+                        location = (
+                            metatags.get("og:locality")
+                            or pagemap.get("place", [{}])[0].get("name")
+                            or pagemap.get("postaladdress", [{}])[0].get("addressLocality")
+                            or "Unknown Location"
+                        )
+    
+                        # Extract salary
+                        salary = (
+                            pagemap.get("offer", [{}])[0].get("salary")
+                            or self.extract_salary_from_snippet(item.get("snippet", ""))
+                            or "Not specified"
+                        )
+    
+                        job_data = {
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": company,
+                            "location": location,
+                            "description": item.get("snippet", "No description") or "No description",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": salary,
+                            "source": "Google Custom Search",
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                        }
+    
+                        title_lower = (job_data["title"] or "").lower()
+                        if any(word in title_lower for word in ["intern", "internship", "trainee"]):
+                            all_internships.append(job_data)
+                        else:
+                            all_jobs.append(job_data)
+    
+                        time.sleep(0.5)
+    
+                except Exception as e:
+                    st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
+                    continue
+    
+            # Remove duplicates & sort
+            unique_jobs = self.remove_duplicates(all_jobs)
+            unique_internships = self.remove_duplicates(all_internships)
+    
+            unique_jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+            unique_internships.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+    
+            st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
+    
+            return {
+                "jobs": unique_jobs[:20],
+                "internships": unique_internships[:10],
+                "search_queries": search_queries[:8]
+            }
+    
+        except Exception as e:
+            st.error(f"❌ Error with job search: {e}")
+            return {"jobs": [], "internships": [], "search_queries": []}
 
 
     def search_jobs_with_custom_search_api_location(self, skills: List[str], job_interests: List[str], location: str) -> Dict[str, List]:
