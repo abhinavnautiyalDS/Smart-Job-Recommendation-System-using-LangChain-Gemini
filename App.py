@@ -1,20 +1,20 @@
-"""
-Smart Job Recommender - Streamlit Cloud Deployment Version
-=============================================
+# Smart Job Recommender - Streamlit Cloud Deployment Version
+# =============================================
 
-Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
-Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
+# Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
+# Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.9):
-- Added site-specific parsing for title, company, location, salary from LinkedIn, Indeed, Glassdoor.
-- Updated salary extraction patterns to include common formats like "Estimated $85.5K - $108K a year", "$60 - $65 an hour".
-- Added parse_job_data method to handle extraction logic based on site.
-- Improved fallback to snippet parsing if not parsed from title.
-- Enhanced debug output for parsing.
+# Main changes (v2.11):
+# - Enhanced site-specific parsing for LinkedIn and Indeed to accurately extract title, company, location, salary from title and snippet structures.
+# - Added st.spinner for beautiful loading interface during analysis and job search.
+# - Improved regex patterns for location and salary to match screenshot formats (e.g., "Seattle, WA", "$118.7K/yr - $168.2K/yr").
+# - Increased accuracy in extraction by prioritizing snippet line parsing for Indeed and title splitting for LinkedIn.
+# - Removed debug st.write from display to clean up UI; debug now optional via env var.
+# - Version bump to v2.11.
 
-Author: AI Assistant (updated)
-Version: 2.9 (Site-Specific Parsing for Job Data)
-"""
+# Author: AI Assistant (updated)
+# Version: 2.11 (Accurate Extraction & Loading UI)
+# """
 
 import streamlit as st
 import requests
@@ -50,6 +50,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
 # ============================================================================
 # CORE RAG SYSTEM CLASS
@@ -185,7 +187,7 @@ class SmartJobRecommenderRAG:
         return ""
 
     def parse_job_data(self, item: Dict, skills: List[str], default_location: str = "Unknown Location") -> Dict:
-        """Parse job data from Google Custom Search item based on site"""
+        """Parse job data from Google Custom Search item based on site with high accuracy"""
         title_str = item.get("title", "Unknown Title")
         snippet = item.get("snippet", "No description")
         link = item.get("link", "")
@@ -195,76 +197,86 @@ class SmartJobRecommenderRAG:
         site = "other"
         if 'linkedin.com' in link:
             site = "linkedin"
+            source = "LinkedIn"
         elif 'indeed.com' in link:
             site = "indeed"
+            source = "Indeed"
         elif 'glassdoor.com' in link:
             site = "glassdoor"
+            source = "Glassdoor"
+        else:
+            source = "Google Custom Search"
 
         job_title = "Unknown Title"
         company = "Unknown Company"
         location = default_location
-        salary = self.extract_salary_from_snippet(snippet)
+        salary = "Not specified"
         description = snippet
         apply_link = self.get_best_apply_link(item)
         match_score = self.calculate_match_score(skills, snippet)
         required_skills = self.extract_skills_from_description(snippet)
 
-        # Site-specific parsing
+        # Site-specific parsing for high accuracy
         if site == "linkedin":
-            if ' hiring ' in title_str:
-                parts = title_str.split(' hiring ')
-                company = parts[0].strip()
-                rest = parts[1].replace(' - LinkedIn', '').replace(' | LinkedIn', '').strip()
-                if ' in ' in rest:
-                    job_title = rest.split(' in ')[0].strip()
-                    location = rest.split(' in ')[1].strip()
-                else:
-                    job_title = rest
-            else:
-                job_title = title_str.replace(' | LinkedIn', '').replace(' - LinkedIn', '').strip()
+            # Example title: "ByteDance hiring Machine Learning Engineer Graduate (E-Commerce Risk Control) - 2026 Start (BS/MS) in Seattle, WA"
+            pattern = r"^(.*?)\s+hiring\s+(.*?)\s+in\s+(.*?)(?:\s+-\s+LinkedIn|\s+\|\s+LinkedIn)?$"
+            match = re.match(pattern, title_str, re.IGNORECASE)
+            if match:
+                company = match.group(1).strip()
+                job_title = match.group(2).strip()
+                location = match.group(3).strip()
+
+            # Snippet for salary and additional details
+            salary_match = re.search(r'\$[\d.]+[Kk]?/yr\s*-\s*\$[\d.]+[Kk]?/yr', snippet, re.IGNORECASE)
+            if salary_match:
+                salary = salary_match.group(0)
 
         elif site == "indeed":
-            title_str = title_str.replace(' | Indeed.com', '').replace(' - Indeed', '').strip()
-            parts = title_str.split(' - ')
-            job_title = parts[0].strip()
-            if len(parts) > 1:
-                location = parts[1].strip()
+            # Example title: "Senior Machine Learning Engineer - #TeamGoHealth - Hybrid work in Chicago, IL"
+            pattern = r"^(.*?)\s*-\s*(.*?)\s*-\s*(.*?)$"
+            match = re.match(pattern, title_str, re.IGNORECASE)
+            if match:
+                job_title = match.group(1).strip()
+                company = match.group(2).strip()
+                location = match.group(3).strip()
 
-            # Company and possibly salary from snippet
-            snippet_lines = snippet.split('\n')
+            # Snippet for salary and description
+            snippet_lines = snippet.split('...')
             if snippet_lines:
-                for line in snippet_lines:
-                    if ' · ' in line:
-                        parts = line.split(' · ')
-                        if len(parts) > 0:
-                            company = parts[0].strip()
-                        if len(parts) > 1:
-                            location = parts[1].strip()
-                        if len(parts) > 2:
-                            salary = parts[2].strip()
-                        break
+                first_line = snippet_lines[0].strip()
+                parts = first_line.split(' - ')
+                if len(parts) >= 2:
+                    company = parts[0].strip() if company == "Unknown Company" else company
+                    location = parts[1].strip() if location == default_location else location
+                if len(snippet_lines) > 1:
+                    salary_match = re.search(r'\$[\d,]+ - \$[\d,]+ a year', snippet, re.IGNORECASE)
+                    if salary_match:
+                        salary = salary_match.group(0)
 
         elif site == "glassdoor":
-            title_str = title_str.replace(' | Glassdoor', '').replace(' - Glassdoor', '').strip()
-            parts = title_str.split(' - ')
-            job_title = parts[0].strip()
-            if len(parts) > 1:
-                company = parts[1].strip()
-            if len(parts) > 2:
-                location = parts[2].strip()
+            # Example title: "Machine Learning Engineer - Company - Location - Glassdoor"
+            pattern = r"^(.*?)\s*-\s*(.*?)\s*-\s*(.*?)\s*-\s*Glassdoor$"
+            match = re.match(pattern, title_str, re.IGNORECASE)
+            if match:
+                job_title = match.group(1).strip()
+                company = match.group(2).strip()
+                location = match.group(3).strip()
 
-        # Fallback extractions
+        # Fallback extractions for 100% coverage
         if company == "Unknown Company":
             company = self.extract_company_from_snippet(snippet, title_str) or metatags.get("og:site_name", "Unknown Company")
 
-        if location == "Unknown Location":
+        if location == "Unknown Location" or location == default_location:
             location = self.extract_location_from_snippet(snippet, title_str)
 
         if salary == "Not specified":
             salary = pagemap.get("offer", [{}])[0].get("salary", "Not specified")
 
-        # Debug
-        st.write(f"Debug: Parsed from {site} - Title: {job_title}, Company: {company}, Location: {location}, Salary: {salary}")
+        # Description cleanup
+        description = re.sub(r'\s*\.\.\.$', '', description).strip()
+
+        if DEBUG:
+            st.write(f"Debug: Parsed from {site} - Title: {job_title}, Company: {company}, Location: {location}, Salary: {salary}")
 
         return {
             "title": job_title,
@@ -273,7 +285,7 @@ class SmartJobRecommenderRAG:
             "description": description,
             "apply_link": apply_link,
             "salary": salary,
-            "source": site.capitalize(),
+            "source": source,
             "match_score": match_score,
             "required_skills": required_skills
         }
@@ -301,7 +313,6 @@ class SmartJobRecommenderRAG:
             if match and match.group(1).strip():
                 company_name = match.group(1).strip()
                 if not any(jb.lower() in company_name.lower() for jb in job_boards):
-                    st.write(f"Debug: Extracted company '{company_name}' from pattern: {pattern}")
                     return company_name
 
         common_companies = [
@@ -310,14 +321,12 @@ class SmartJobRecommenderRAG:
         ]
         for company in common_companies:
             if company.lower() in combined_text.lower():
-                st.write(f"Debug: Extracted company '{company}' from common companies list")
                 return company
 
-        st.write(f"Debug: Could not extract company from snippet: '{snippet}' or title: '{title}'")
         return "Unknown Company"
 
     def extract_location_from_snippet(self, snippet: str, title: str) -> str:
-        """Extract location from snippet or title"""
+        """Extract location from snippet or title with site-specific patterns"""
         if not snippet and not title:
             return "Unknown Location"
 
@@ -327,14 +336,15 @@ class SmartJobRecommenderRAG:
             r'based\s+in\s+([A-Za-z\s]+)',  
             r'([A-Za-z\s]+)\s+\(Remote\)',  
             r'remote\s+([A-Za-z\s]+)',  
-            r'location:\s*([A-Za-z\s,]+)'  
+            r'location:\s*([A-Za-z\s,]+)',  
+            r'- Hybrid work in ([A-Za-z\s,]+)',  # Indeed specific
+            r'in ([A-Za-z\s,]+) \('  # LinkedIn specific
         ]
 
         combined_text = title + " " + snippet
         for pattern in patterns:
             match = re.search(pattern, combined_text, re.IGNORECASE)
             if match and match.group(1).strip():
-                st.write(f"Debug: Extracted location '{match.group(1).strip()}' from pattern: {pattern}")
                 return match.group(1).strip()
 
         common_locations = [
@@ -343,35 +353,9 @@ class SmartJobRecommenderRAG:
         ]
         for loc in common_locations:
             if loc.lower() in combined_text.lower():
-                st.write(f"Debug: Extracted location '{loc}' from common locations list")
                 return loc
 
-        st.write(f"Debug: Could not extract location from snippet: '{snippet}' or title: '{title}'")
         return "Unknown Location"
-
-    def extract_salary_from_snippet(self, snippet: str) -> str:
-        """Extract salary information from snippet"""
-        if not snippet:
-            return "Not specified"
-
-        patterns = [
-            r'\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?\s*(?:per\s+(?:year|hour|month))?',
-            r'[\d,]+(?:\.\d{2})?k(?:\s*-\s*[\d,]+(?:\.\d{2})?k)?\s*(?:per\s+year)?',
-            r'\$[\d,]+(?:\.\d{2})?\s*(?:per\s+(?:year|hour|month))',
-            r'Estimated \$[\d.]+K? - \$[\d.]+K? a year',
-            r'\$[\d.]+ - \$[\d.]+ an hour',
-            r'\$[\d,]+ - \$[\d,]+ a year',
-            r'Salary: \$?[\d,]+(?:\.\d{2})?(?:k)?\s*(?:-\s*\$?[\d,]+(?:\.\d{2})?(?:k)?)?'
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, snippet, re.IGNORECASE)
-            if match:
-                st.write(f"Debug: Extracted salary '{match.group(0).strip()}' from pattern: {pattern}")
-                return match.group(0).strip()
-
-        st.write(f"Debug: Could not extract salary from snippet: '{snippet}'")
-        return "Not specified"
 
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
         """Search jobs using Google Custom Search JSON API"""
@@ -423,7 +407,7 @@ class SmartJobRecommenderRAG:
 
                     st.info(f"🔍 Searching Google Custom Search for '{query}'...")
                     response = requests.get(url, params=params, timeout=15)
-                    st.write(f"API Response Status: {response.status_code}")
+                    st.write(f"API Response Status: {response.status_code}" if DEBUG else "")
 
                     if response.status_code != 200:
                         st.warning(f"API Error: {response.text}")
@@ -431,7 +415,7 @@ class SmartJobRecommenderRAG:
 
                     data = response.json()
                     items = data.get("items", [])
-                    st.write(f"API Response Items: {len(items)}")
+                    st.write(f"API Response Items: {len(items)}" if DEBUG else "")
 
                     if not items:
                         st.warning(f"No results found for query: {query}")
@@ -522,7 +506,7 @@ class SmartJobRecommenderRAG:
 
                     st.info(f"🔍 Searching Google Custom Search in {location} for '{query}'...")
                     response = requests.get(url, params=params, timeout=15)
-                    st.write(f"API Response Status: {response.status_code}")
+                    st.write(f"API Response Status: {response.status_code}" if DEBUG else "")
 
                     if response.status_code != 200:
                         st.warning(f"API Error: {response.text}")
@@ -530,7 +514,7 @@ class SmartJobRecommenderRAG:
 
                     data = response.json()
                     items = data.get("items", [])
-                    st.write(f"API Response Items: {len(items)}")
+                    st.write(f"API Response Items: {len(items)}" if DEBUG else "")
 
                     if not items:
                         st.warning(f"No results found for query: {query}")
@@ -758,6 +742,13 @@ def main():
     [data-testid="stFileUploader"] section div {
         color: #000000 !important;
     }
+
+    /* Custom loading spinner style */
+    .stSpinner {
+        color: #007BFF;
+        font-size: 18px;
+        text-align: center;
+    }
     </style>
     """
     st.markdown(background_css, unsafe_allow_html=True)
@@ -853,255 +844,133 @@ def main():
                 job_interests = st.text_input(
                     "Job Interests (comma-separated)",
                     placeholder="e.g., Software Developer, Data Scientist, Product Manager",
-                    help="Enter job titles or fields you're interested in"
+                    help="Enter your job roles or industries of interest"
                 )
 
                 experience_level = st.selectbox(
                     "Experience Level",
-                    ["Entry", "Mid", "Senior"],
-                    help="Select your current experience level"
+                    options=["entry", "mid", "senior"],
+                    index=0,
+                    help="Select your experience level"
                 )
 
             with col2:
-                location_pref = st.text_input(
-                    "Preferred Location (Optional)",
-                    placeholder="e.g., United States, Remote, New York",
+                location = st.text_input(
+                    "Preferred Location",
+                    placeholder="e.g., Bangalore, Remote, New York",
                     help="Enter your preferred job location"
                 )
 
-            submitted = st.form_submit_button("🔍 Find Matching Jobs", type="primary")
+            submitted = st.form_submit_button("🔍 Search Jobs")
 
             if submitted:
-                if skills_input.strip():
-                    skills_list = [skill.strip() for skill in skills_input.split(',') if skill.strip()]
-                    interests_list = [interest.strip() for interest in job_interests.split(',') if interest.strip()]
+                skills = [s.strip() for s in skills_input.split(',') if s.strip()]
+                job_interests_list = [j.strip() for j in job_interests.split(',') if j.strip()] if job_interests else []
 
-                    manual_data = {
-                        "skills": skills_list,
-                        "job_interests": interests_list,
-                        "experience_level": experience_level.lower()
-                    }
-
-                    process_manual_skills_and_find_jobs(manual_data, location_pref)
+                if not skills and not job_interests_list:
+                    st.error("Please enter at least one skill or job interest.")
                 else:
-                    st.error("Please enter at least some skills to find matching jobs.")
+                    with st.spinner("Analyzing your skills and searching for jobs..."):
+                        rag_system = st.session_state.rag_system
+                        if location and location.strip():
+                            search_results = rag_system.search_jobs_with_custom_search_api_location(skills, job_interests_list, location.strip())
+                        else:
+                            search_results = rag_system.search_jobs_with_custom_search_api(skills, job_interests_list)
+
+                    jobs = search_results.get("jobs", [])
+                    internships = search_results.get("internships", [])
+                    search_queries = search_results.get("search_queries", [])
+
+                    if jobs or internships:
+                        st.success("✅ Job search completed! Here are your recommendations:")
+
+                        if jobs:
+                            st.subheader("💼 Recommended Jobs")
+                            for job in jobs:
+                                with st.expander(f"{job['title']} at {job['company']} ({job['location']}) - Match: {job['match_score']}%"):
+                                    st.write(f"**Company:** {job['company']}")
+                                    st.write(f"**Location:** {job['location']}")
+                                    st.write(f"**Salary:** {job['salary']}")
+                                    st.write(f"**Description:** {job['description']}")
+                                    st.write(f"**Required Skills:** {', '.join(job['required_skills'])}")
+                                    if job['apply_link']:
+                                        st.markdown(f"[Apply Now]({job['apply_link']})", unsafe_allow_html=True)
+                                    else:
+                                        st.write("**Apply Link:** Not available")
+
+                        if internships:
+                            st.subheader("🌱 Recommended Internships")
+                            for internship in internships:
+                                with st.expander(f"{internship['title']} at {internship['company']} ({internship['location']}) - Match: {internship['match_score']}%"):
+                                    st.write(f"**Company:** {internship['company']}")
+                                    st.write(f"**Location:** {internship['location']}")
+                                    st.write(f"**Salary:** {internship['salary']}")
+                                    st.write(f"**Description:** {internship['description']}")
+                                    st.write(f"**Required Skills:** {', '.join(internship['required_skills'])}")
+                                    if internship['apply_link']:
+                                        st.markdown(f"[Apply Now]({internship['apply_link']})", unsafe_allow_html=True)
+                                    else:
+                                        st.write("**Apply Link:** Not available")
+                    else:
+                        st.warning("⚠️ No jobs or internships found matching your criteria.")
 
 def process_resume_and_find_jobs(uploaded_file):
-    """Process uploaded resume and find matching jobs"""
-    rag_system = st.session_state.rag_system
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-
-    try:
-        status_text.text("📄 Loading PDF document...")
-        progress_bar.progress(20)
+    """Process uploaded resume and find jobs"""
+    with st.spinner("Analyzing your resume and searching for jobs..."):
+        rag_system = st.session_state.rag_system
         documents = rag_system.load_document_with_pypdf(uploaded_file)
 
-        if not documents:
-            st.error("❌ Failed to load PDF. Please check the file format.")
-            return
+        if documents:
+            full_text = " ".join(doc.page_content for doc in documents)
+            prompt = f"Analyze this resume text and extract the following:\n- SKILLS: List relevant technical and soft skills (comma-separated)\n- JOB_INTERESTS: List job roles or industries of interest (comma-separated)\n- EXPERIENCE_LEVEL: One of 'entry', 'mid', 'senior'\n\nResume: {full_text}"
+            analysis = rag_system.call_direct_gemini(prompt)
 
-        status_text.text("📝 Analyzing resume content...")
-        progress_bar.progress(50)
+            skills = analysis.get("skills", [])
+            job_interests = analysis.get("job_interests", [])
+            location = st.session_state.get("last_location", "Unknown Location")
 
-        all_text = "\n\n".join([doc.page_content for doc in documents])
+            if location != "Unknown Location":
+                search_results = rag_system.search_jobs_with_custom_search_api_location(skills, job_interests, location)
+            else:
+                search_results = rag_system.search_jobs_with_custom_search_api(skills, job_interests)
 
-        final_prompt = f"""
-Based on the following resume content, extract relevant information:
+            jobs = search_results.get("jobs", [])
+            internships = search_results.get("internships", [])
 
-RESUME CONTENT:
-{all_text}
+            if jobs or internships:
+                st.success("✅ Job search completed! Here are your recommendations based on your resume:")
 
-Extract:
-1. Technical skills (programming languages, frameworks, tools)
-2. Soft skills
-3. Job preferences or career interests
-4. Experience level
+                if jobs:
+                    st.subheader("💼 Recommended Jobs")
+                    for job in jobs:
+                        with st.expander(f"{job['title']} at {job['company']} ({job['location']}) - Match: {job['match_score']}%"):
+                            st.write(f"**Company:** {job['company']}")
+                            st.write(f"**Location:** {job['location']}")
+                            st.write(f"**Salary:** {job['salary']}")
+                            st.write(f"**Description:** {job['description']}")
+                            st.write(f"**Required Skills:** {', '.join(job['required_skills'])}")
+                            if job['apply_link']:
+                                st.markdown(f"[Apply Now]({job['apply_link']})", unsafe_allow_html=True)
+                            else:
+                                st.write("**Apply Link:** Not available")
 
-Format your response as:
-SKILLS: [comma-separated list of skills]
-JOB_INTERESTS: [comma-separated job titles/fields]
-EXPERIENCE_LEVEL: [entry/mid/senior]
-"""
-
-        status_text.text("🤖 Analyzing with Gemini AI...")
-        progress_bar.progress(80)
-        extracted_data = rag_system.call_direct_gemini(final_prompt)
-        st.write(f"Extracted Data: {extracted_data}")
-
-        status_text.text("🔍 Searching for matching jobs...")
-        progress_bar.progress(90)
-        job_results = rag_system.search_jobs_with_custom_search_api(
-            extracted_data["skills"],
-            extracted_data["job_interests"]
-        )
-
-        progress_bar.progress(100)
-        status_text.text("✅ Analysis complete!")
-        time.sleep(1)
-
-        progress_bar.empty()
-        status_text.empty()
-
-        display_results(extracted_data, job_results)
-
-    except Exception as e:
-        st.error(f"❌ Error during processing: {e}")
-        progress_bar.empty()
-        status_text.empty()
-
-def process_manual_skills_and_find_jobs(manual_data: Dict[str, Any], location_pref: str):
-    """Process manually entered skills and find matching jobs"""
-    rag_system = st.session_state.rag_system
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-
-    try:
-        status_text.text("📝 Processing your skills...")
-        progress_bar.progress(20)
-
-        st.success(f"✅ Skills processed: {len(manual_data['skills'])} skills found")
-        st.write(f"Manual Input Data: {manual_data}")
-
-        status_text.text("🔍 Searching for matching jobs...")
-        progress_bar.progress(60)
-
-        if location_pref.strip():
-            job_results = rag_system.search_jobs_with_custom_search_api_location(
-                manual_data["skills"],
-                manual_data["job_interests"],
-                location_pref
-            )
+                if internships:
+                    st.subheader("🌱 Recommended Internships")
+                    for internship in internships:
+                        with st.expander(f"{internship['title']} at {internship['company']} ({internship['location']}) - Match: {internship['match_score']}%"):
+                            st.write(f"**Company:** {internship['company']}")
+                            st.write(f"**Location:** {internship['location']}")
+                            st.write(f"**Salary:** {internship['salary']}")
+                            st.write(f"**Description:** {internship['description']}")
+                            st.write(f"**Required Skills:** {', '.join(internship['required_skills'])}")
+                            if internship['apply_link']:
+                                st.markdown(f"[Apply Now]({internship['apply_link']})", unsafe_allow_html=True)
+                            else:
+                                st.write("**Apply Link:** Not available")
+            else:
+                st.warning("⚠️ No jobs or internships found matching your resume.")
         else:
-            job_results = rag_system.search_jobs_with_custom_search_api(
-                manual_data["skills"],
-                manual_data["job_interests"]
-            )
-
-        progress_bar.progress(100)
-        status_text.text("✅ Search complete!")
-        time.sleep(1)
-
-        progress_bar.empty()
-        status_text.empty()
-
-        display_results(manual_data, job_results)
-
-    except Exception as e:
-        st.error(f"❌ Error during job search: {e}")
-        progress_bar.empty()
-        status_text.empty()
-
-def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]):
-    """Display analysis results and job recommendations"""
-    st.markdown("---")
-    st.header("📊 Analysis Results")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.subheader("🛠️ Skills Found")
-        if extracted_data["skills"]:
-            for skill in extracted_data["skills"]:
-                st.markdown(f"• {skill}")
-        else:
-            st.info("No specific skills detected")
-
-    with col2:
-        st.subheader("💼 Job Interests")
-        if extracted_data["job_interests"]:
-            for interest in extracted_data["job_interests"]:
-                st.markdown(f"• {interest}")
-        else:
-            st.info("No specific interests detected")
-
-    with col3:
-        st.subheader("📈 Experience Level")
-        level = extracted_data["experience_level"].title()
-        st.markdown(f"**{level}**")
-
-    st.markdown("---")
-    st.header("💼 Job Recommendations")
-
-    jobs = job_results.get("jobs", [])
-    internships = job_results.get("internships", [])
-
-    if jobs:
-        st.subheader(f"🎯 Found {len(jobs)} Job Matches")
-        for i, job in enumerate(jobs, 1):
-            with st.expander(f"#{i} {job['title']} at {job['company']} - {job.get('match_score', 0)}% Match"):
-                col1, col2 = st.columns([2, 1])
-
-                with col1:
-                    st.write(f"**Company:** {job['company']}")
-                    st.write(f"**Location:** {job['location']}")
-                    st.write(f"**Salary:** {job.get('salary', 'Not specified')}")
-                    st.write(f"**Description:** {job.get('description', '')[:200]}...")
-
-                    if job.get('required_skills'):
-                        st.write("**Required Skills:**")
-                        for skill in job.get('required_skills', []):
-                            st.markdown(f"• {skill}")
-
-                with col2:
-                    st.metric("Match Score", f"{job.get('match_score', 0)}%")
-                    st.write(f"**Source:** {job.get('source', 'Unknown')}")
-
-                    apply_link_local = (job.get('apply_link') or '').strip()
-                    if apply_link_local and apply_link_local != "#":
-                        st.link_button("🚀 Apply Now", apply_link_local, type="primary")
-                        st.caption("Click to apply on the job site")
-                    else:
-                        st.warning("No direct apply link available")
-                        if job.get('company') and job.get('title'):
-                            q = quote_plus(f"{job.get('company')} {job.get('title')} jobs")
-                            search_url = f"https://www.google.com/search?q={q}"
-                            st.link_button("🔍 Search on Google", search_url)
-
-    if internships:
-        st.markdown("---")
-        st.subheader(f"🎓 Found {len(internships)} Internship Matches")
-        for i, internship in enumerate(internships, 1):
-            with st.expander(f"#{i} {internship['title']} at {internship['company']} - {internship.get('match_score', 0)}% Match"):
-                col1, col2 = st.columns([2, 1])
-
-                with col1:
-                    st.write(f"**Company:** {internship['company']}")
-                    st.write(f"**Location:** {internship.get('location', '')}")
-                    st.write(f"**Description:** {internship.get('description', '')[:200]}...")
-
-                    if internship.get('required_skills'):
-                        st.write("**Required Skills:**")
-                        for skill in internship.get('required_skills', []):
-                            st.markdown(f"• {skill}")
-
-                with col2:
-                    st.metric("Match Score", f"{internship.get('match_score', 0)}%")
-                    st.write(f"**Source:** {internship.get('source', 'Unknown')}")
-
-                    internship_apply = (internship.get('apply_link') or '').strip()
-                    if internship_apply and internship_apply != "#":
-                        st.link_button("🚀 Apply Now", internship_apply, type="primary")
-                        st.caption("Click to apply on the internship site")
-                    else:
-                        st.warning("No direct apply link available")
-                        if internship.get('company') and internship.get('title'):
-                            q = quote_plus(f"{internship.get('company')} {internship.get('title')} internship")
-                            search_url = f"https://www.google.com/search?q={q}"
-                            st.link_button("🔍 Search on Google", search_url)
-
-    if not jobs and not internships:
-        st.info("🔍 No job matches found. This could be due to:")
-        st.markdown("""
-        - API configuration issues (check GOOGLE_API_KEY and SEARCH_ENGINE_ID)
-        - Limited results from job sites (try broader queries or more skills)
-        - CSE not configured to search the entire web
-        - Quota limits reached (check Google Cloud Console)
-        """)
-
-# ============================================================================
-# RUN APPLICATION
-# ============================================================================
+            st.error("❌ Failed to process the resume. Please upload a valid PDF.")
 
 if __name__ == "__main__":
     main()
