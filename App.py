@@ -5,22 +5,22 @@ Smart Job Recommender - Streamlit Cloud Deployment Version
 Updated version using Google Custom Search JSON API with GOOGLE_API_KEY and SEARCH_ENGINE_ID.
 Compatible with streamlit>=1.48.0, requests>=2.32.0, google-generativeai==0.8.0, pypdf==5.9.0.
 
-Main changes (v2.9):
-- Added site-specific parsing for title, company, location, salary from LinkedIn, Indeed, Glassdoor.
-- Updated salary extraction patterns to include common formats like "Estimated $85.5K - $108K a year", "$60 - $65 an hour".
-- Added parse_job_data method to handle extraction logic based on site.
-- Improved fallback to snippet parsing if not parsed from title.
-- Enhanced debug output for parsing.
+Main changes (v2.6):
+- Added background image via CSS.
+- Expanded search queries for diversity.
+- Relaxed duplicate removal using apply_link.
+- Added debug output for API responses and queries.
+- Increased result limit to 10 per query.
+- Enhanced error handling for empty results.
 
 Author: AI Assistant (updated)
-Version: 2.9 (Site-Specific Parsing for Job Data)
+Version: 2.6 (Custom Search API with Background Image)
 """
 
 import streamlit as st
 import requests
 import time
 import os
-import re
 from typing import List, Dict, Any
 import tempfile
 from urllib.parse import quote_plus
@@ -65,12 +65,20 @@ class SmartJobRecommenderRAG:
     def initialize_gemini(self) -> bool:
         """Initialize Gemini AI client"""
         try:
-            gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+            try:
+                gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+            except Exception:
+                gemini_key = os.environ.get("GEMINI_API_KEY")
+
             if gemini_key and GEMINI_AVAILABLE:
-                genai.configure(api_key=gemini_key)
-                self.gemini_client = genai.GenerativeModel('gemini-1.5-flash')
-                st.success("AI system initialized successfully")
-                return True
+                try:
+                    genai.configure(api_key=gemini_key)
+                    self.gemini_client = genai.GenerativeModel('gemini-1.5-flash')
+                    st.success("AI system initialized successfully")
+                    return True
+                except Exception as e:
+                    st.error(f"❌ Error initializing Gemini client: {e}")
+                    return False
             else:
                 st.error("❌ Gemini API key required. Please add GEMINI_API_KEY to your Streamlit secrets.")
                 return False
@@ -93,7 +101,7 @@ class SmartJobRecommenderRAG:
             reader = PdfReader(temp_file_path)
 
             for page_num, page in enumerate(reader.pages):
-                text = page.extract_text() if hasattr(page, 'extract_text') else ""
+                text = page.extract_text_lines() if hasattr(page, 'extract_text_lines') else page.extract_text() if hasattr(page, 'extract_text') else None
                 if text and text.strip():
                     doc_obj = type('Document', (), {
                         'page_content': text,
@@ -101,13 +109,19 @@ class SmartJobRecommenderRAG:
                     })()
                     documents.append(doc_obj)
 
-            os.unlink(temp_file_path)
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+
             st.success(f"✅ Loaded {len(documents)} pages from PDF")
             return documents
 
         except Exception as e:
             st.error(f"❌ Error loading PDF: {e}")
             return []
+
+
 
     def call_direct_gemini(self, prompt: str) -> Dict[str, Any]:
         """Call Gemini directly for text analysis"""
@@ -129,7 +143,7 @@ class SmartJobRecommenderRAG:
                     skills = [s.strip() for s in skills_text.split(',') if s.strip()]
                 elif line.startswith('JOB_INTERESTS:'):
                     interests_text = line.replace('JOB_INTERESTS:', '').strip()
-                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]
+                    job_interests = [i.strip() for i in interests_text.split(',') if i.strip()]  # Fixed 's' to 'i'
                 elif line.startswith('EXPERIENCE_LEVEL:'):
                     experience_level = line.replace('EXPERIENCE_LEVEL:', '').strip().lower()
 
@@ -156,7 +170,7 @@ class SmartJobRecommenderRAG:
             return ""
 
     def get_best_apply_link(self, job: Dict[str, Any], response_data: Dict[str, Any] = None) -> str:
-        """Try multiple fields for an application/website link"""
+        """Try many possible fields for an application/website link"""
         candidates = [
             'link', 'url', 'apply_link', 'application_link', 'apply_url', 'job_posting_url',
             'canonical_url', 'destination', 'job_link', 'website', 'company_website', 'company_url'
@@ -184,200 +198,15 @@ class SmartJobRecommenderRAG:
 
         return ""
 
-    def parse_job_data(self, item: Dict, skills: List[str], default_location: str = "Unknown Location") -> Dict:
-        """Parse job data from Google Custom Search item based on site"""
-        title_str = item.get("title", "Unknown Title")
-        snippet = item.get("snippet", "No description")
-        link = item.get("link", "")
-        pagemap = item.get("pagemap", {})
-        metatags = pagemap.get("metatags", [{}])[0]
-
-        site = "other"
-        if 'linkedin.com' in link:
-            site = "linkedin"
-        elif 'indeed.com' in link:
-            site = "indeed"
-        elif 'glassdoor.com' in link:
-            site = "glassdoor"
-
-        job_title = "Unknown Title"
-        company = "Unknown Company"
-        location = default_location
-        salary = self.extract_salary_from_snippet(snippet)
-        description = snippet
-        apply_link = self.get_best_apply_link(item)
-        match_score = self.calculate_match_score(skills, snippet)
-        required_skills = self.extract_skills_from_description(snippet)
-
-        # Site-specific parsing
-        if site == "linkedin":
-            if ' hiring ' in title_str:
-                parts = title_str.split(' hiring ')
-                company = parts[0].strip()
-                rest = parts[1].replace(' - LinkedIn', '').replace(' | LinkedIn', '').strip()
-                if ' in ' in rest:
-                    job_title = rest.split(' in ')[0].strip()
-                    location = rest.split(' in ')[1].strip()
-                else:
-                    job_title = rest
-            else:
-                job_title = title_str.replace(' | LinkedIn', '').replace(' - LinkedIn', '').strip()
-
-        elif site == "indeed":
-            title_str = title_str.replace(' | Indeed.com', '').replace(' - Indeed', '').strip()
-            parts = title_str.split(' - ')
-            job_title = parts[0].strip()
-            if len(parts) > 1:
-                location = parts[1].strip()
-
-            # Company and possibly salary from snippet
-            snippet_lines = snippet.split('\n')
-            if snippet_lines:
-                for line in snippet_lines:
-                    if ' · ' in line:
-                        parts = line.split(' · ')
-                        if len(parts) > 0:
-                            company = parts[0].strip()
-                        if len(parts) > 1:
-                            location = parts[1].strip()
-                        if len(parts) > 2:
-                            salary = parts[2].strip()
-                        break
-
-        elif site == "glassdoor":
-            title_str = title_str.replace(' | Glassdoor', '').replace(' - Glassdoor', '').strip()
-            parts = title_str.split(' - ')
-            job_title = parts[0].strip()
-            if len(parts) > 1:
-                company = parts[1].strip()
-            if len(parts) > 2:
-                location = parts[2].strip()
-
-        # Fallback extractions
-        if company == "Unknown Company":
-            company = self.extract_company_from_snippet(snippet, title_str) or metatags.get("og:site_name", "Unknown Company")
-
-        if location == "Unknown Location":
-            location = self.extract_location_from_snippet(snippet, title_str)
-
-        if salary == "Not specified":
-            salary = pagemap.get("offer", [{}])[0].get("salary", "Not specified")
-
-        # Debug
-        st.write(f"Debug: Parsed from {site} - Title: {job_title}, Company: {company}, Location: {location}, Salary: {salary}")
-
-        return {
-            "title": job_title,
-            "company": company,
-            "location": location,
-            "description": description,
-            "apply_link": apply_link,
-            "salary": salary,
-            "source": site.capitalize(),
-            "match_score": match_score,
-            "required_skills": required_skills
-        }
-
-    def extract_company_from_snippet(self, snippet: str, title: str) -> str:
-        """Extract company name from snippet or title, avoiding job board names"""
-        if not snippet and not title:
-            return "Unknown Company"
-
-        job_boards = [
-            "indeed", "linkedin", "glassdoor", "monster", "careerbuilder",
-            "simplyhired", "dice", "jobstreet", "jobsdb"
-        ]
-
-        patterns = [
-            r'at\s+([A-Za-z0-9\s&-]+?)(?:\s*[-|]\s*(?:jobs|careers|apply))?',  
-            r'([A-Za-z0-9\s&-]+?)\s*is\s+hiring',  
-            r'([A-Za-z0-9\s&-]+?)\s*(?:Careers|Jobs)',  
-            r'([A-Za-z0-9\s&-]+?)\s*[-|]\s*\w+\s*(?:Engineer|Developer|Manager)'  
-        ]
-
-        combined_text = title + " " + snippet
-        for pattern in patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match and match.group(1).strip():
-                company_name = match.group(1).strip()
-                if not any(jb.lower() in company_name.lower() for jb in job_boards):
-                    st.write(f"Debug: Extracted company '{company_name}' from pattern: {pattern}")
-                    return company_name
-
-        common_companies = [
-            "Google", "Amazon", "Microsoft", "Apple", "Meta", "Tesla", "IBM",
-            "Oracle", "Accenture", "Deloitte", "Salesforce", "Adobe"
-        ]
-        for company in common_companies:
-            if company.lower() in combined_text.lower():
-                st.write(f"Debug: Extracted company '{company}' from common companies list")
-                return company
-
-        st.write(f"Debug: Could not extract company from snippet: '{snippet}' or title: '{title}'")
-        return "Unknown Company"
-
-    def extract_location_from_snippet(self, snippet: str, title: str) -> str:
-        """Extract location from snippet or title"""
-        if not snippet and not title:
-            return "Unknown Location"
-
-        patterns = [
-            r'in\s+([A-Za-z\s,]+),\s*[A-Z]{2}',  
-            r'([A-Za-z\s]+),\s*[A-Z]{2}',  
-            r'based\s+in\s+([A-Za-z\s]+)',  
-            r'([A-Za-z\s]+)\s+\(Remote\)',  
-            r'remote\s+([A-Za-z\s]+)',  
-            r'location:\s*([A-Za-z\s,]+)'  
-        ]
-
-        combined_text = title + " " + snippet
-        for pattern in patterns:
-            match = re.search(pattern, combined_text, re.IGNORECASE)
-            if match and match.group(1).strip():
-                st.write(f"Debug: Extracted location '{match.group(1).strip()}' from pattern: {pattern}")
-                return match.group(1).strip()
-
-        common_locations = [
-            "New York", "San Francisco", "Seattle", "Austin", "Boston", "Chicago",
-            "Los Angeles", "Remote", "London", "Toronto", "Bangalore", "Mumbai"
-        ]
-        for loc in common_locations:
-            if loc.lower() in combined_text.lower():
-                st.write(f"Debug: Extracted location '{loc}' from common locations list")
-                return loc
-
-        st.write(f"Debug: Could not extract location from snippet: '{snippet}' or title: '{title}'")
-        return "Unknown Location"
-
-    def extract_salary_from_snippet(self, snippet: str) -> str:
-        """Extract salary information from snippet"""
-        if not snippet:
-            return "Not specified"
-
-        patterns = [
-            r'\$[\d,]+(?:\.\d{2})?(?:\s*-\s*\$[\d,]+(?:\.\d{2})?)?\s*(?:per\s+(?:year|hour|month))?',
-            r'[\d,]+(?:\.\d{2})?k(?:\s*-\s*[\d,]+(?:\.\d{2})?k)?\s*(?:per\s+year)?',
-            r'\$[\d,]+(?:\.\d{2})?\s*(?:per\s+(?:year|hour|month))',
-            r'Estimated \$[\d.]+K? - \$[\d.]+K? a year',
-            r'\$[\d.]+ - \$[\d.]+ an hour',
-            r'\$[\d,]+ - \$[\d,]+ a year',
-            r'Salary: \$?[\d,]+(?:\.\d{2})?(?:k)?\s*(?:-\s*\$?[\d,]+(?:\.\d{2})?(?:k)?)?'
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, snippet, re.IGNORECASE)
-            if match:
-                st.write(f"Debug: Extracted salary '{match.group(0).strip()}' from pattern: {pattern}")
-                return match.group(0).strip()
-
-        st.write(f"Debug: Could not extract salary from snippet: '{snippet}'")
-        return "Not specified"
-
     def search_jobs_with_custom_search_api(self, skills: List[str], job_interests: List[str]) -> Dict[str, List]:
         """Search jobs using Google Custom Search JSON API"""
         try:
-            google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
+            try:
+                google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
+            except Exception:
+                google_api_key = os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
 
             if not google_api_key or not search_engine_id:
                 st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
@@ -385,7 +214,7 @@ class SmartJobRecommenderRAG:
 
             search_queries = []
             if skills:
-                primary_skills = skills[:3]
+                primary_skills = skills[:3]  # Use top 3 skills for diversity
                 for skill in primary_skills:
                     search_queries.extend([
                         f"{skill} developer jobs",
@@ -395,7 +224,7 @@ class SmartJobRecommenderRAG:
                     ])
 
             if job_interests:
-                for interest in job_interests[:3]:
+                for interest in job_interests[:3]:  # Use top 3 interests
                     search_queries.extend([
                         f"{interest} jobs",
                         f"{interest} careers",
@@ -405,48 +234,59 @@ class SmartJobRecommenderRAG:
             if not search_queries:
                 search_queries = ["software developer jobs", "python developer jobs", "data scientist jobs"]
 
-            st.write(f"🔍 Generated search queries: {search_queries}")
+            st.write(f"🔍 Generated search queries: {search_queries}")  # Debug
 
             all_jobs = []
             all_internships = []
+
             url = "https://www.googleapis.com/customsearch/v1"
 
-            for query in search_queries[:5]:
+            for query in search_queries[:5]:  # Increased to 5 queries
                 try:
                     params = {
                         "key": google_api_key,
                         "cx": search_engine_id,
                         "q": query + " site:*.linkedin.com | site:*.indeed.com | site:*.glassdoor.com | site:*.monster.com | site:*.careerbuilder.com",
-                        "num": 10,
-                        "safe": "off"
+                        "num": 10,  # Max results per query
+                        "safe": "off"  # Disable SafeSearch for broader results
                     }
 
                     st.info(f"🔍 Searching Google Custom Search for '{query}'...")
-                    response = requests.get(url, params=params, timeout=15)
-                    st.write(f"API Response Status: {response.status_code}")
 
+                    response = requests.get(url, params=params, timeout=15)
+                    st.write(f"API Response Status: {response.status_code}")  # Debug
                     if response.status_code != 200:
                         st.warning(f"API Error: {response.text}")
                         continue
 
                     data = response.json()
-                    items = data.get("items", [])
-                    st.write(f"API Response Items: {len(items)}")
+                    st.write(f"API Response Items: {len(data.get('items', []))}")  # Debug
 
-                    if not items:
+                    items_key = "items"
+                    if items_key not in data or not data[items_key]:
                         st.warning(f"No results found for query: {query}")
                         continue
 
-                    for item in items:
-                        job_data = self.parse_job_data(item, skills)
+                    for item in data[items_key]:
+                        job_data = {
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                            "location": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:locality", "Unknown Location") or "Unknown Location",
+                            "description": item.get("snippet", "No description") or "No description",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": "Not specified",
+                            "source": "Google Custom Search",
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                        }
 
-                        title_lower = job_data["title"].lower()
+                        title_lower = (job_data["title"] or "").lower()
                         if any(word in title_lower for word in ["intern", "internship", "trainee"]):
                             all_internships.append(job_data)
                         else:
                             all_jobs.append(job_data)
 
-                        time.sleep(0.5)
+                    time.sleep(0.5)
 
                 except Exception as e:
                     st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
@@ -461,8 +301,8 @@ class SmartJobRecommenderRAG:
             st.success(f"✅ Found {len(unique_jobs)} jobs and {len(unique_internships)} internships")
 
             return {
-                "jobs": unique_jobs[:20],
-                "internships": unique_internships[:10],
+                "jobs": unique_jobs[:20],  # Increased limit
+                "internships": unique_internships[:10],  # Increased limit
                 "search_queries": search_queries[:8]
             }
 
@@ -473,8 +313,12 @@ class SmartJobRecommenderRAG:
     def search_jobs_with_custom_search_api_location(self, skills: List[str], job_interests: List[str], location: str) -> Dict[str, List]:
         """Search jobs with location preference using Google Custom Search JSON API"""
         try:
-            google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
+            try:
+                google_api_key = st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = st.secrets.get("SEARCH_ENGINE_ID") or os.environ.get("SEARCH_ENGINE_ID")
+            except Exception:
+                google_api_key = os.environ.get("GOOGLE_API_KEY")
+                search_engine_id = os.environ.get("SEARCH_ENGINE_ID")
 
             if not google_api_key or not search_engine_id:
                 st.error("❌ Google API key and Search Engine ID required. Please add GOOGLE_API_KEY and SEARCH_ENGINE_ID to your Streamlit secrets.")
@@ -504,10 +348,11 @@ class SmartJobRecommenderRAG:
             if not search_queries:
                 search_queries = [f"software developer jobs {location}", f"python developer jobs {location}"]
 
-            st.write(f"🔍 Generated location-based search queries: {search_queries}")
+            st.write(f"🔍 Generated location-based search queries: {search_queries}")  # Debug
 
             all_jobs = []
             all_internships = []
+
             url = "https://www.googleapis.com/customsearch/v1"
 
             for query in search_queries[:5]:
@@ -521,31 +366,41 @@ class SmartJobRecommenderRAG:
                     }
 
                     st.info(f"🔍 Searching Google Custom Search in {location} for '{query}'...")
-                    response = requests.get(url, params=params, timeout=15)
-                    st.write(f"API Response Status: {response.status_code}")
 
+                    response = requests.get(url, params=params, timeout=15)
+                    st.write(f"API Response Status: {response.status_code}")  # Debug
                     if response.status_code != 200:
                         st.warning(f"API Error: {response.text}")
                         continue
 
                     data = response.json()
-                    items = data.get("items", [])
-                    st.write(f"API Response Items: {len(items)}")
+                    st.write(f"API Response Items: {len(data.get('items', []))}")  # Debug
 
-                    if not items:
+                    items_key = "items"
+                    if items_key not in data or not data[items_key]:
                         st.warning(f"No results found for query: {query}")
                         continue
 
-                    for item in items:
-                        job_data = self.parse_job_data(item, skills, location)
+                    for item in data[items_key]:
+                        job_data = {
+                            "title": item.get("title", "Unknown Title") or "Unknown Title",
+                            "company": item.get("pagemap", {}).get("metatags", [{}])[0].get("og:site_name", "Unknown Company") or "Unknown Company",
+                            "location": location,
+                            "description": item.get("snippet", "No description") or "No description",
+                            "apply_link": self.get_best_apply_link(item, response_data=data),
+                            "salary": "Not specified",
+                            "source": "Google Custom Search",
+                            "match_score": self.calculate_match_score(skills, item.get("snippet", "")),
+                            "required_skills": self.extract_skills_from_description(item.get("snippet", ""))
+                        }
 
-                        title_lower = job_data["title"].lower()
+                        title_lower = (job_data["title"] or "").lower()
                         if any(word in title_lower for word in ["intern", "internship", "trainee"]):
                             all_internships.append(job_data)
                         else:
                             all_jobs.append(job_data)
 
-                        time.sleep(0.5)
+                    time.sleep(0.5)
 
                 except Exception as e:
                     st.warning(f"⚠️ Error searching Google Custom Search: {str(e)}")
@@ -574,7 +429,7 @@ class SmartJobRecommenderRAG:
         if not user_skills or not job_description:
             return 0
 
-        job_desc_lower = job_description.lower()
+        job_desc_lower = (job_description or "").lower()
         matched_skills = 0
 
         for skill in user_skills:
@@ -633,6 +488,42 @@ class SmartJobRecommenderRAG:
 # STREAMLIT UI COMPONENTS
 # ============================================================================
 
+# def main():
+#     """Main application function"""
+#     # Add background image CSS
+#     background_css = """
+#     <style>
+#     .stApp {
+
+#         background-image: url("https://getwallpapers.com/wallpaper/full/c/1/1/872506-new-white-wallpaper-background-1920x1200-for-samsung.jpg");  /* Replace with your image URL */
+#         background-size: cover;
+#         background-position: center;
+#         background-attachment: fixed;
+#         background-repeat: no-repeat;
+#     }
+#     /* Improve text readability */
+#     .stApp * {
+#         color: #000000;  /* black text for contrast */
+#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);  /* Text shadow for readability */
+#     }
+#     /* Ensure sidebar text is readable */
+#     .stSidebar * {
+#         color: #000000;
+#         text-shadow: 1px 1px 2px rgba(0, 0, 0, 0);
+#     }
+#     /* Optional: Style buttons for better visibility */
+#     .stButton>button {
+#         background-color: #FFFFFF;
+#         color: white;
+#         border-radius: 5px;
+#         border: none;
+#     }
+#     .stButton>button:hover {
+#         background-color: #FFFFFF;
+#     }
+#     </style>
+#     """
+#     st.markdown(background_css, unsafe_allow_html=True)
 def main():
     """Main application function"""
     # Add background image CSS for light theme
@@ -642,9 +533,9 @@ def main():
     body, .stApp, .css-1aumxhk, .st-emotion-cache-1aumxhk {
         background-color: #FFFFFF; /* White background */
         background-image: url("https://images.unsplash.com/photo-1519120944692-1a8d8cfc107f?q=80&w=1936&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
-        background-size: cover;
-        background-position: center;
         color: #000000; /* Light black text for contrast */
+        background-position: center;
+        color: #000;  /* Ensures text remains readable */
     }
 
     /* Ensure sidebar matches light theme */
@@ -721,46 +612,68 @@ def main():
         border-top: 1px solid #E0E0E0;
     }
 
-    /* Style selectbox (dropdown) */
+    /* Style selectbox (dropdown) to have white text */
     .stSelectbox div[role="listbox"] * {
-        color: #000000 !important;
+        color: #FFFFFF !important;
     }
     .stSelectbox div[role="option"] {
-        color: #000000 !important;
-        background-color: #FFFFFF; /* White background to match theme */
+        color: #FFFFFF !important;
+        background-color: #333333; /* Dark background to contrast white text */
     }
+    </style>
+    """
 
+    # Search input box styling
+    st.markdown("""
+    <style>
     /* Text Input & Text Area */
     [data-testid="stTextInput"] input,
     [data-testid="stTextArea"] textarea {
-        background-color: #F8F9FA !important;
-        color: #000000 !important;
-        border: 1px solid #CCCCCC !important;
-        border-radius: 5px !important;
+        background-color: #d3d3d3 !important;
+        color: black !important;
     }
     [data-testid="stTextInput"] input::placeholder,
     [data-testid="stTextArea"] textarea::placeholder {
-        color: #666666 !important;
+        color: #000000 !important;
     }
 
     /* Select Dropdown (Experience Level) */
     [data-testid="stSelectbox"] div[data-baseweb="select"] {
-        background-color: #F8F9FA !important;
+        background-color: #d3d3d3 !important;
+        color: black !important;
+    }
+    [data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: black !important;
+    }
+
+    /* Browse files button */
+    [data-testid="stFileUploaderBrowseButton"] {
+        background-color: #FFFFFF !important;
         color: #000000 !important;
         border: 1px solid #CCCCCC !important;
         border-radius: 5px !important;
+        padding: 4px 12px !important;
     }
-    [data-testid="stSelectbox"] div[data-baseweb="select"] * {
+    [data-testid="stFileUploaderBrowseButton"]:hover {
+        background-color: #F0F0F0 !important;
         color: #000000 !important;
     }
 
     /* File uploader text inside drop area */
     [data-testid="stFileUploader"] section div {
-        color: #000000 !important;
+        color: #000000 !important; /* black text */
     }
     </style>
-    """
+    """, unsafe_allow_html=True)
+
     st.markdown(background_css, unsafe_allow_html=True)
+
+
+
+
+
+
+
 
     if "rag_system" not in st.session_state:
         st.session_state.rag_system = SmartJobRecommenderRAG()
@@ -858,7 +771,7 @@ def main():
 
                 experience_level = st.selectbox(
                     "Experience Level",
-                    ["Entry", "Mid", "Senior"],
+                    ["entry", "mid", "senior"],
                     help="Select your current experience level"
                 )
 
@@ -879,7 +792,7 @@ def main():
                     manual_data = {
                         "skills": skills_list,
                         "job_interests": interests_list,
-                        "experience_level": experience_level.lower()
+                        "experience_level": experience_level
                     }
 
                     process_manual_skills_and_find_jobs(manual_data, location_pref)
@@ -927,7 +840,7 @@ EXPERIENCE_LEVEL: [entry/mid/senior]
         status_text.text("🤖 Analyzing with Gemini AI...")
         progress_bar.progress(80)
         extracted_data = rag_system.call_direct_gemini(final_prompt)
-        st.write(f"Extracted Data: {extracted_data}")
+        st.write(f"Extracted Data: {extracted_data}")  # Debug
 
         status_text.text("🔍 Searching for matching jobs...")
         progress_bar.progress(90)
@@ -961,7 +874,7 @@ def process_manual_skills_and_find_jobs(manual_data: Dict[str, Any], location_pr
         progress_bar.progress(20)
 
         st.success(f"✅ Skills processed: {len(manual_data['skills'])} skills found")
-        st.write(f"Manual Input Data: {manual_data}")
+        st.write(f"Manual Input Data: {manual_data}")  # Debug
 
         status_text.text("🔍 Searching for matching jobs...")
         progress_bar.progress(60)
@@ -1023,11 +936,12 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
     st.markdown("---")
     st.header("💼 Job Recommendations")
 
-    jobs = job_results.get("jobs", [])
-    internships = job_results.get("internships", [])
+    jobs = job_results.get("jobs", []) if isinstance(job_results, dict) else []
+    internships = job_results.get("internships", []) if isinstance(job_results, dict) else []
 
     if jobs:
         st.subheader(f"🎯 Found {len(jobs)} Job Matches")
+
         for i, job in enumerate(jobs, 1):
             with st.expander(f"#{i} {job['title']} at {job['company']} - {job.get('match_score', 0)}% Match"):
                 col1, col2 = st.columns([2, 1])
@@ -1036,7 +950,7 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
                     st.write(f"**Company:** {job['company']}")
                     st.write(f"**Location:** {job['location']}")
                     st.write(f"**Salary:** {job.get('salary', 'Not specified')}")
-                    st.write(f"**Description:** {job.get('description', '')[:200]}...")
+                    st.write(f"**Description:** {job.get('description','')[:200]}...")
 
                     if job.get('required_skills'):
                         st.write("**Required Skills:**")
@@ -1044,7 +958,7 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
                             st.markdown(f"• {skill}")
 
                 with col2:
-                    st.metric("Match Score", f"{job.get('match_score', 0)}%")
+                    st.metric("Match Score", f"{job.get('match_score',0)}%")
                     st.write(f"**Source:** {job.get('source', 'Unknown')}")
 
                     apply_link_local = (job.get('apply_link') or '').strip()
@@ -1061,14 +975,15 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
     if internships:
         st.markdown("---")
         st.subheader(f"🎓 Found {len(internships)} Internship Matches")
+
         for i, internship in enumerate(internships, 1):
-            with st.expander(f"#{i} {internship['title']} at {internship['company']} - {internship.get('match_score', 0)}% Match"):
+            with st.expander(f"#{i} {internship['title']} at {internship['company']} - {internship.get('match_score',0)}% Match"):
                 col1, col2 = st.columns([2, 1])
 
                 with col1:
                     st.write(f"**Company:** {internship['company']}")
-                    st.write(f"**Location:** {internship.get('location', '')}")
-                    st.write(f"**Description:** {internship.get('description', '')[:200]}...")
+                    st.write(f"**Location:** {internship.get('location','')}")
+                    st.write(f"**Description:** {internship.get('description','')[:200]}...")
 
                     if internship.get('required_skills'):
                         st.write("**Required Skills:**")
@@ -1076,7 +991,7 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
                             st.markdown(f"• {skill}")
 
                 with col2:
-                    st.metric("Match Score", f"{internship.get('match_score', 0)}%")
+                    st.metric("Match Score", f"{internship.get('match_score',0)}%")
                     st.write(f"**Source:** {internship.get('source', 'Unknown')}")
 
                     internship_apply = (internship.get('apply_link') or '').strip()
@@ -1099,17 +1014,29 @@ def display_results(extracted_data: Dict[str, Any], job_results: Dict[str, List]
         - Quota limits reached (check Google Cloud Console)
         """)
 
-def trigger_n8n_webhook():
-    webhook_url = "https://abhinaut-app.n8n.cloud/webhook-test/e73fcd5f-b267-450b-9ac9-d274e46d957d"
-    headers = {"Content-Type": "application/json"}  # Optional, based on n8n requirements
-    response = requests.get(webhook_url, headers=headers)
-    if response.status_code == 200:
-        st.success("Webhook triggered successfully!")
-    else:
-        st.error("Failed to trigger webhook.")
-
-if st.button("Apply"):
-    trigger_n8n_webhook()
+    ########
+    for i, job in enumerate(job_data):
+        with st.expander(f"{job['title']} at {job['company']}"):
+            st.write(f"**Location:** {job['location']}")
+            st.write(f"**Description:** {job['description']}")
+            st.write(f"**Match Score:** {job['match_score']:.2f}%")
+            st.write(f"**Link:** [{job['link']}]({job['link']})")
+            if st.button("🚀 Apply Now", key=f"apply_{i}"):
+                apply_data = {
+                    "company": job['company'],
+                    "job_title": job['title'],
+                    "location": job['location'],
+                    "job_description": job['description'],
+                    "user_skills": ','.join(extracted_data['skills']),
+                    "experience_level": extracted_data['experience_level']
+                }
+                import requests
+                n8n_webhook_url = "https://[your-subdomain].n8n.cloud/webhook/job-apply-webhook"  # Replace with your URL
+                response = requests.post(n8n_webhook_url, json=apply_data)
+                if response.status_code == 200:
+                    st.success("✅ Application logged and cover letter generated!")
+                else:
+                    st.error(f"❌ Error: {response.text}")
 
 
 
@@ -1119,3 +1046,12 @@ if st.button("Apply"):
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
